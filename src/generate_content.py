@@ -47,13 +47,20 @@ def main():
     media_url = ""
     media_type = "IMAGE"
 
-    cli_args = sys.argv[1:]
-    if len(cli_args) > 0 and cli_args[0].strip():
-        topic = cli_args[0].strip()
-    if len(cli_args) > 1 and cli_args.strip():
-        media_url = cli_args.strip()
-    if len(cli_args) > 2 and cli_args.strip():
-        media_type = cli_args.strip()
+    # Ambil argumen secara aman tanpa risiko list index error
+    args = sys.argv[1:]
+    if args:
+        val = args.pop(0).strip()
+        if val:
+            topic = val
+    if args:
+        val = args.pop(0).strip()
+        if val:
+            media_url = val
+    if args:
+        val = args.pop(0).strip()
+        if val:
+            media_type = val
 
     print(f"🤖 Meminta Gemini AI menulis konten tentang: '{topic}'...")
     caption = generate_caption(topic)
