@@ -19,11 +19,13 @@ Kriteria penulisan:
 6. Berikan langsung teks caption-nya saja tanpa pengantar atau basa-basi apa pun.
 """
 
+# Daftar model Gemini generasi baru
+MODELS_TO_TRY = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash-latest"]
+
 def generate_caption(topic: str) -> str:
     if not GEMINI_API_KEY:
         raise Exception("Kunci GEMINI_API_KEY belum terpasang di GitHub Secrets.")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{
             "parts": [{"text": PROMPT_TEMPLATE.format(topic=topic)}]
@@ -34,20 +36,24 @@ def generate_caption(topic: str) -> str:
         }
     }
     
-    res = requests.post(url, json=payload)
-    data = res.json()
-    
-    if "candidates" not in data or not data["candidates"]:
-        raise Exception(f"Gagal generate konten dari Gemini: {data}")
+    last_error = None
+    for model in MODELS_TO_TRY:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        res = requests.post(url, json=payload)
+        data = res.json()
         
-    return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        if "candidates" in data and data["candidates"]:
+            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        else:
+            last_error = data
+            
+    raise Exception(f"Gagal generate konten dari Gemini: {last_error}")
 
 def main():
     topic = "Strategi membangun aset digital dan otomasi bisnis untuk pemula"
     media_url = ""
     media_type = "IMAGE"
 
-    # Ambil argumen secara aman tanpa risiko list index error
     args = sys.argv[1:]
     if args:
         val = args.pop(0).strip()
