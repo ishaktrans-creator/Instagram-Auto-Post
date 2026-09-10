@@ -2,9 +2,9 @@ name: Social Media Auto Publisher
 
 on:
   schedule:
-    # Berjalan jam 09:00 WITA (01:00 UTC) dan jam 17:00 WITA (09:00 UTC)
+    # Jadwal otomatis: Jam 09:00 WITA (01:00 UTC) dan Jam 17:00 WITA (09:00 UTC)
     - cron: '0 1,9 * * *'
-  workflow_dispatch: # Tombol Run Manual
+  workflow_dispatch: # Tombol eksekusi manual kapan saja
 
 jobs:
   publish:
@@ -29,7 +29,10 @@ jobs:
       - name: Run Auto Publisher
         env:
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python src/main.py
 
