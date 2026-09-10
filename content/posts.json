@@ -16,14 +16,13 @@
   {
     "id": "post-003",
     "caption": "BelajarBisnis #ManajemenKeuangan #StrategiBisnis #BisnisKecil\n\n5.",
-    "status": "FAILED",
     "image_url": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080&q=80",
-    "error_message": "Gagal membuat container Image: {'error': {'message': 'Error validating access token: Session has expired on Thursday, 10-Sep-26 14:00:00 PDT. The current time is Thursday, 10-Sep-26 14:43:59 PDT.', 'type': 'OAuthException', 'code': 190, 'error_subcode': 463, 'fbtrace_id': 'A3l0L8gk1REJnKNIsErArlt'}}"
+    "status": "PUBLISHED"
   },
   {
     "id": "post-004",
-    "caption": "[KEUANGAN BISNIS]\nOmzet meroket tapi rekening bisnis selalu kosong? Awas, banyak UMKM gulung tikar bukan karena sepi pembeli, melainkan karena",
-    "status": "PENDING",
+    "caption": "[KEUANGAN BISNIS]\nOmzet meroket tapi rekening bisnis selalu kosong? Awas, banyak UMKM gulung tikar bukan karena sepi pembeli, melainkan karena salah kelola arus kas.\n\n1. Pisahkan rekening pribadi & bisnis\n2. Alokasikan gaji tetap untuk pemilik\n3. Catat arus kas harian secara disiplin\n\nKetik 'MAHIR' di komentar jika kamu ingin sharing seputar keuangan usaha! 👇\n\n#KeuanganBisnis #UMKM #TipsBisnis #ManajemenKeuangan #Solopreneur",
     "image_url": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080&q=80",
-      }
+    "status": "PENDING"
+  }
 ]
