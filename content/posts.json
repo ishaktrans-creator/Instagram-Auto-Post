@@ -3,6 +3,7 @@
     "id": "post-001",
     "caption": "Halo dunia! Postingan perdana ini diterbitkan secara otomatis dari cloud menggunakan sistem otomasi cerdas. 🚀🤖\n\n#Automation #Technology #Innovation #Python",
     "image_url": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080&q=80",
-    "status": "PENDING"
+    "status": "FAILED",
+    "error_message": "Gagal membuat container: {'error': {'message': 'Invalid OAuth access token - Cannot parse access token', 'type': 'OAuthException', 'code': 190, 'fbtrace_id': 'AueFJhqWP9WxZjHWY3_mN9K'}}"
   }
 ]
