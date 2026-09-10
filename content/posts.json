@@ -1,10 +1,14 @@
 [
   {
     "id": "post-001",
-    "caption": "Halo dunia! Postingan perdana ini diterbitkan secara otomatis dari cloud menggunakan sistem otomasi cerdas. 🚀🤖\n\n#Automation #Technology #Innovation #Python",
-    "image_url": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080&q=80",
-    "status": "PUBLISHED",
-    "published_id": "18064440308765919",
-    "published_at": "2026-09-11T02:39:38.212275+08:00"
+    "caption": "Halo dunia! Postingan perdana...",
+    "image_url": "...",
+    "status": "PUBLISHED"
+  },
+  {
+    "id": "post-002-reels",
+    "caption": "Uji coba video Reels otomatis dari sistem cloud! 🎬✨\n\n#Reels #Automation #DigitalCreator #Innovation",
+    "video_url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+    "status": "PENDING"
   }
 ]
