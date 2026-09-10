@@ -53,7 +53,6 @@ def create_instagram_container(post: dict) -> str:
             children_ids.append(c_res["id"])
             time.sleep(2)
 
-        # Buat parent carousel
         parent_payload = {
             "media_type": "CAROUSEL",
             "children": ",".join(children_ids),
@@ -122,21 +121,29 @@ def publish_to_instagram(container_id: str) -> str:
 def publish_to_facebook_page(post: dict) -> str:
     """Menerbitkan postingan ke Halaman Facebook Mahir Digital (Cross-Posting)."""
     if not FB_PAGE_ID:
+        print("⚠️ Catatan: FB_PAGE_ID tidak ditemukan di environment/secrets.")
         return ""
+
     caption = post.get("caption", "")
+    print(f"📄 Menghubungi Facebook Page ID: {FB_PAGE_ID}...")
 
     # Jika Video
     if "video_url" in post and post["video_url"]:
         url = f"{GRAPH_API_URL}/{FB_PAGE_ID}/videos"
         payload = {"file_url": post["video_url"], "description": caption, "access_token": ACCESS_TOKEN}
         res = requests.post(url, params=payload).json()
-        return res.get("id", "")
+        if "id" in res:
+            return res["id"]
+        raise Exception(f"Facebook Video Error: {res}")
     # Jika Gambar
     elif "image_url" in post and post["image_url"]:
         url = f"{GRAPH_API_URL}/{FB_PAGE_ID}/photos"
         payload = {"url": post["image_url"], "caption": caption, "access_token": ACCESS_TOKEN}
         res = requests.post(url, params=payload).json()
-        return res.get("id", "")
+        if "id" in res:
+            return res["id"]
+        raise Exception(f"Facebook Photo Error: {res}")
+
     return ""
 
 def main():
