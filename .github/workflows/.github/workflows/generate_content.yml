@@ -1,0 +1,55 @@
+name: AI Content Generator
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: 'Topik Konten yang Ingin Dibuat'
+        required: true
+        default: 'Kesalahan fatal mengelola keuangan bisnis kecil'
+      media_type:
+        description: 'Tipe Media (IMAGE atau REELS)'
+        required: true
+        default: 'IMAGE'
+        type: choice
+        options:
+          - IMAGE
+          - REELS
+      media_url:
+        description: 'Tautan Gambar atau Video MP4 (Opsional)'
+        required: false
+        default: ''
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Generate Content with Gemini AI
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python src/generate_content.py "${{ github.event.inputs.topic }}" "${{ github.event.inputs.media_url }}" "${{ github.event.inputs.media_type }}"
+
+      - name: Commit New Draft to posts.json
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add content/posts.json
+          git commit -m "feat: add new AI-generated draft [skip ci]"
+          git push
