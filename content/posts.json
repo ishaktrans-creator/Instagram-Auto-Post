@@ -12,5 +12,11 @@
     "status": "PUBLISHED",
     "published_id": "17920199727430909",
     "published_at": "2026-09-11T03:37:02.386989+08:00"
+  },
+  {
+    "id": "post-003",
+    "caption": "BelajarBisnis #ManajemenKeuangan #StrategiBisnis #BisnisKecil\n\n5.",
+    "status": "PENDING",
+    "image_url": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080&q=80"
   }
 ]
