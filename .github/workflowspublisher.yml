@@ -1,0 +1,41 @@
+name: Social Media Auto Publisher
+
+on:
+  schedule:
+    # Berjalan jam 09:00 WITA (01:00 UTC) dan jam 17:00 WITA (09:00 UTC)
+    - cron: '0 1,9 * * *'
+  workflow_dispatch: # Tombol Run Manual
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Auto Publisher
+        env:
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+        run: |
+          python src/main.py
+
+      - name: Commit Updated Status
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add content/posts.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update post status to published [skip ci]" && git push)
