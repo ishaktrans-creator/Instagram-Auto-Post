@@ -6,19 +6,25 @@ from datetime import datetime
 import zoneinfo
 
 LOCAL_TZ = zoneinfo.ZoneInfo("Asia/Makassar")
-IG_USER_ID = os.getenv("IG_USER_ID")
-ACCESS_TOKEN = os.getenv("META_ACCESS_TOKEN")
+
+# Bersihkan token secara otomatis dari spasi, tanda kutip, atau teks bawaan
+raw_token = os.getenv("META_ACCESS_TOKEN", "").strip().strip('"').strip("'")
+if ":" in raw_token:
+    raw_token = raw_token.split(":")[-1].strip().strip('"').strip("'")
+ACCESS_TOKEN = raw_token
+
+IG_USER_ID = os.getenv("IG_USER_ID", "").strip()
 GRAPH_API_URL = "https://graph.facebook.com/v21.0"
 
 def create_media_container(image_url: str, caption: str) -> str:
     """Langkah 1: Membuat wadah media di Instagram."""
     url = f"{GRAPH_API_URL}/{IG_USER_ID}/media"
-    payload = {
+    params = {
         "image_url": image_url,
         "caption": caption,
         "access_token": ACCESS_TOKEN
     }
-    res = requests.post(url, data=payload)
+    res = requests.post(url, params=params)
     data = res.json()
     if "id" not in data:
         raise Exception(f"Gagal membuat container: {data}")
@@ -27,11 +33,11 @@ def create_media_container(image_url: str, caption: str) -> str:
 def publish_media(creation_id: str) -> str:
     """Langkah 2: Mempublikasikan wadah media ke feed Instagram."""
     url = f"{GRAPH_API_URL}/{IG_USER_ID}/media_publish"
-    payload = {
+    params = {
         "creation_id": creation_id,
         "access_token": ACCESS_TOKEN
     }
-    res = requests.post(url, data=payload)
+    res = requests.post(url, params=params)
     data = res.json()
     if "id" not in data:
         raise Exception(f"Gagal menerbitkan postingan: {data}")
@@ -53,22 +59,22 @@ def main():
         if post.get("status") == "PENDING":
             print(f"Memproses postingan: {post.get('id')}...")
             try:
-                # 1. Buat Container Media
                 container_id = create_media_container(post["image_url"], post["caption"])
                 print(f"Container ID berhasil dibuat: {container_id}")
-
-                # Jeda sejenak agar server Instagram selesai memproses gambar
+                
+                # Jeda 5 detik agar server Meta selesai memproses gambar
                 time.sleep(5)
-
-                # 2. Publish ke Instagram Feed
+                
                 published_id = publish_media(container_id)
                 print(f"Sukses tayang di Instagram! Post ID: {published_id}")
-
+                
                 post["status"] = "PUBLISHED"
                 post["published_id"] = published_id
                 post["published_at"] = now.isoformat()
+                if "error_message" in post:
+                    del post["error_message"]
                 updated = True
-                break  # Terbitkan satu postingan per siklus
+                break
             except Exception as e:
                 print(f"Gagal mempublikasikan: {e}")
                 post["status"] = "FAILED"
