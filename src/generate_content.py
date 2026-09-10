@@ -20,6 +20,9 @@ Kriteria penulisan:
 """
 
 def generate_caption(topic: str) -> str:
+    if not GEMINI_API_KEY:
+        raise Exception("Kunci GEMINI_API_KEY belum terpasang di GitHub Secrets.")
+
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{
@@ -40,13 +43,17 @@ def generate_caption(topic: str) -> str:
     return data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
 def main():
-    topic = sys.argv if len(sys.argv) > 1 and sys.argv.strip() else "Strategi membangun aset digital dan otomasi bisnis untuk pemula"
-    media_url = sys.argv if len(sys.argv) > 2 and sys.argv.strip() else ""
-    media_type = sys.argv if len(sys.argv) > 3 and sys.argv.strip() else "IMAGE"
+    args = sys.argv
+    topic = args.strip() if len(args) > 1 and args.strip() else "Strategi membangun aset digital dan otomasi bisnis untuk pemula"
+    media_url = args.strip() if len(args) > 2 else ""
+    media_type = args.strip() if len(args) > 3 else "IMAGE"
 
     print(f"🤖 Meminta Gemini AI menulis konten tentang: '{topic}'...")
     caption = generate_caption(topic)
     print("✅ Caption berhasil dibuat oleh AI!\n")
+    print("--- PRATINJAU KONTEN ---")
+    print(caption)
+    print("------------------------\n")
 
     if os.path.exists(POST_FILE):
         with open(POST_FILE, "r", encoding="utf-8") as f:
@@ -71,6 +78,7 @@ def main():
 
     posts.append(new_post)
 
+    os.makedirs("content", exist_ok=True)
     with open(POST_FILE, "w", encoding="utf-8") as f:
         json.dump(posts, f, indent=2, ensure_ascii=False)
 
