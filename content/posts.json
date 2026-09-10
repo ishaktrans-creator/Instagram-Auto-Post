@@ -9,6 +9,7 @@
     "id": "post-002-reels",
     "caption": "Uji coba video Reels otomatis dari sistem cloud! 🎬✨\n\n#Reels #Automation #DigitalCreator #Innovation",
     "video_url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    "status": "PENDING"
+    "status": "FAILED",
+    "error_message": "Meta gagal memproses video: {'status_code': 'ERROR', 'id': '17950967889318677'}"
   }
 ]
