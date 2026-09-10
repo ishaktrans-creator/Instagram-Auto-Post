@@ -20,44 +20,14 @@ Kriteria penulisan:
 6. Berikan langsung teks caption-nya saja tanpa pengantar atau basa-basi apa pun.
 """
 
-def get_best_available_model() -> str:
-    """Otomatis mengambil model Gemini yang aktif untuk akun Anda dari Google."""
-    list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
-    res = requests.get(list_url)
-    data = res.json()
-
-    if "error" in data:
-        raise Exception(f"Google API Key Error: {data['error']}")
-
-    available_models = []
-    for m in data.get("models", []):
-        methods = m.get("supportedGenerationMethods", [])
-        name = m.get("name", "")
-        # Pilih model yang mendukung generateContent dan berbasis Gemini
-        if "generateContent" in methods and "gemini" in name.lower():
-            available_models.append(name)
-
-    if not available_models:
-        raise Exception(f"Tidak ada model Gemini yang aktif untuk API key ini. Respon Google: {data}")
-
-    # Prioritaskan model tipe 'flash' agar respon cepat dan hemat kuota
-    selected = available_models[0]
-    for m in available_models:
-        if "flash" in m.lower():
-            selected = m
-            break
-            
-    return selected
-
 def generate_caption(topic: str) -> str:
     if not GEMINI_API_KEY:
         raise Exception("Kunci GEMINI_API_KEY belum terpasang di GitHub Secrets.")
 
-    # 1. Deteksi otomatis model yang bisa dipakai
-    model_name = get_best_available_model()
-    print(f"🚀 Menggunakan model aktif Google: {model_name}")
+    # Model resmi generasi terbaru dari Google
+    model_name = "models/gemini-3.6-flash"
+    print(f"🚀 Menghubungi Google Gemini Model: {model_name}...")
 
-    # 2. Kirim prompt ke model tersebut
     url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{
