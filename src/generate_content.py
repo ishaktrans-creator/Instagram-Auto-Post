@@ -43,10 +43,19 @@ def generate_caption(topic: str) -> str:
     return data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
 def main():
-    args = sys.argv
-    topic = args.strip() if len(args) > 1 and args.strip() else "Strategi membangun aset digital dan otomasi bisnis untuk pemula"
-    media_url = args.strip() if len(args) > 2 else ""
-    media_type = args.strip() if len(args) > 3 else "IMAGE"
+    # Ambil argumen parameter input
+    raw_inputs = sys.argv[1:]
+    
+    topic = "Strategi membangun aset digital dan otomasi bisnis untuk pemula"
+    media_url = ""
+    media_type = "IMAGE"
+
+    if len(raw_inputs) >= 1 and raw_inputs[0].strip():
+        topic = raw_inputs[0].strip()
+    if len(raw_inputs) >= 2 and raw_inputs.strip():
+        media_url = raw_inputs.strip()
+    if len(raw_inputs) >= 3 and raw_inputs.strip():
+        media_type = raw_inputs.strip()
 
     print(f"🤖 Meminta Gemini AI menulis konten tentang: '{topic}'...")
     caption = generate_caption(topic)
