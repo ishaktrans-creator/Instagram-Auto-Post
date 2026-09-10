@@ -9,6 +9,7 @@
     "id": "post-002-reels",
     "caption": "Uji coba video Reels vertikal otomatis dari cloud! 🎬✨\n\n#Reels #Automation #DigitalCreator",
     "video_url": "https://files.catbox.moe/ez3k5w.mp4",
-    "status": "PENDING"
+    "status": "FAILED",
+    "error_message": "Gagal membuat container: {'error': {'message': 'Error validating access token: Session has expired on Thursday, 10-Sep-26 12:00:00 PDT. The current time is Thursday, 10-Sep-26 12:14:02 PDT.', 'type': 'OAuthException', 'code': 190, 'error_subcode': 463, 'fbtrace_id': 'A2rudLY_xfZbuAw6PRdJuEP'}}"
   }
 ]
