@@ -23,7 +23,10 @@
   {
     "id": "post-004",
     "caption": "[KEUANGAN BISNIS]\nOmzet meroket tapi rekening bisnis selalu kosong? Awas, banyak UMKM gulung tikar bukan karena sepi pembeli, melainkan karena",
-    "status": "PENDING",
-    "image_url": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080&q=80"
+    "status": "PUBLISHED",
+    "image_url": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080&q=80",
+    "published_id": "18216484714344635",
+    "fb_published_id": "",
+    "published_at": "2026-09-11T06:10:05.059236+08:00"
   }
 ]
