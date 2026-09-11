@@ -119,7 +119,6 @@ THEMATIC_BACKGROUNDS = {
     "MOTIVATIONAL": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&h=1080&fit=crop&q=80"
 }
 
-# 7 NICHE BAWAAN LENGKAP (210 IDE TERUJI)
 DEFAULT_NICHES = [
     {
         "id": "bisnis_umkm",
@@ -390,7 +389,6 @@ def load_niche_database():
             except Exception:
                 pass
     
-    # Inisialisasi otomatis jika file belum ada
     db = {}
     for n in DEFAULT_NICHES:
         ideas_list = []
@@ -519,7 +517,6 @@ def research_30_ideas_ai(niche_name: str) -> list:
         res = requests.post(url, json=payload, timeout=60).json()
         if "candidates" in res and res["candidates"]:
             raw_text = res["candidates"][0]["content"]["parts"][0]["text"].strip()
-            # Bersihkan blok markdown jika ada
             raw_text = re.sub(r"^```json\s*", "", raw_text)
             raw_text = re.sub(r"^```\s*", "", raw_text)
             raw_text = re.sub(r"\s*```$", "", raw_text).strip()
@@ -701,7 +698,8 @@ with tab_ideas:
     <div style="font-size: 14px; color: #94A3B8; margin-bottom: 20px;">Pilih niche bisnis Anda, temukan ide konten harian, dan klik <b>Gunakan Ide Ini</b> untuk langsung memproses desain visualnya.</div>
     """, unsafe_allow_html=True)
 
-    col_niche, col_ai_refresh = st.columns()
+    # Perbaikan: diberi angka 2 secara eksplisit
+    col_niche, col_ai_refresh = st.columns(2)
     with col_niche:
         niche_options = {v["name"]: k for k, v in niche_db.items()}
         selected_niche_name = st.selectbox("Pilih Niche Konten:", list(niche_options.keys()))
@@ -734,6 +732,7 @@ with tab_ideas:
     avail_ideas = sum(1 for i in current_ideas if i.get("status") == "Tersedia")
     used_ideas = total_ideas - avail_ideas
 
+    # Perbaikan: diberi angka 3 secara eksplisit
     c_met1, c_met2, c_met3 = st.columns(3)
     c_met1.metric("Total Kalender", f"{total_ideas} Hari")
     c_met2.metric("Ide Tersedia", avail_ideas)
@@ -741,10 +740,8 @@ with tab_ideas:
 
     st.markdown("---")
 
-    # Filter status
     filter_status = st.radio("Tampilkan Ide:", ["Semua", "Tersedia", "Sudah Dipakai"], horizontal=True)
 
-    # Render Daftar Ide
     for item in current_ideas:
         item_status = item.get("status", "Tersedia")
         if filter_status != "Semua" and item_status != filter_status:
@@ -756,7 +753,8 @@ with tab_ideas:
         sugg_fmt = item.get("suggested_format", "CAROUSEL")
         
         with st.container():
-            col_info, col_act = st.columns()
+            # Perbaikan: diberi angka 2 secara eksplisit
+            col_info, col_act = st.columns(2)
             with col_info:
                 badge_color = "#22C55E" if item_status == "Tersedia" else "#64748B"
                 st.markdown(f"""
@@ -796,6 +794,7 @@ with tab_studio:
     initial_topic = st.session_state.get("selected_topic", "3 Cara Melipatgandakan Omzet Usaha Tanpa Tambah Modal Besar")
     initial_fmt = st.session_state.get("selected_media_type", "CAROUSEL (3 Slide)")
     
+    # Perbaikan: diberi angka 2 secara eksplisit
     col_input, col_config = st.columns(2)
     with col_input:
         topic_input = st.text_area(
@@ -863,7 +862,7 @@ with tab_studio:
                 save_posts(posts)
                 st.success(f"🎉 Sukses! Draf `{new_id}` berhasil dimasukkan ke antrean posts.json bertanda PENDING!")
 
-# ==================== TAB 3: ANTREAN & KALENDER JADWAL ====================
+# ==================== TAB 3: ANTREAN & KALENDER ====================
 with tab_queue:
     st.markdown("""
     <div style="font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 4px;">Manajemen Antrean & Kalender Jadwal</div>
