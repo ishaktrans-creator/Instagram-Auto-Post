@@ -3,6 +3,7 @@ import json
 import requests
 import sys
 import textwrap
+import time
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 
@@ -30,12 +31,13 @@ THEMATIC_BACKGROUNDS = {
     "MOTIVATIONAL": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&h=1080&fit=crop&q=80"
 }
 
+# Daftar model untuk penanganan failover 503 otomatis
+MODELS_TO_TRY = ["models/gemini-3.6-flash", "models/gemini-2.5-flash", "models/gemini-2.0-flash"]
+
 def generate_caption(topic: str) -> str:
     if not GEMINI_API_KEY:
         raise Exception("Kunci GEMINI_API_KEY belum terpasang di GitHub Secrets.")
 
-    model_name = "models/gemini-3.6-flash"
-    url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{
             "parts": [{"text": PROMPT_TEMPLATE.format(topic=topic)}]
@@ -46,12 +48,29 @@ def generate_caption(topic: str) -> str:
         }
     }
     
-    res = requests.post(url, json=payload).json()
-    if "candidates" not in res or not res["candidates"]:
-        raise Exception(f"Gagal generate konten dari Gemini: {res}")
+    last_error = None
+    for model_name in MODELS_TO_TRY:
+        print(f"🚀 Menghubungi model: {model_name}...")
+        url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={GEMINI_API_KEY}"
         
-    parts = res["candidates"][0]["content"].get("parts", [])
-    return "".join([p.get("text", "") for p in parts]).strip()
+        # Coba hingga 2 kali per model jika terjadi lonjakan 503
+        for attempt in range(2):
+            try:
+                res = requests.post(url, json=payload, timeout=25).json()
+                if "candidates" in res and res["candidates"]:
+                    parts = res["candidates"][0]["content"].get("parts", [])
+                    return "".join([p.get("text", "") for p in parts]).strip()
+                elif "error" in res and res["error"].get("code") == 503:
+                    print(f"⚠️ Model {model_name} sedang sibuk (503). Menunggu 3 detik...")
+                    time.sleep(3)
+                else:
+                    last_error = res
+                    break
+            except Exception as net_err:
+                last_error = str(net_err)
+                time.sleep(2)
+
+    raise Exception(f"Gagal generate konten dari Gemini setelah mencoba model cadangan: {last_error}")
 
 def parse_content(caption: str):
     """Ekstraksi badge, hook, dan poin materi dari teks AI."""
@@ -65,16 +84,16 @@ def parse_content(caption: str):
             badge = line[1:line.find("]")].strip().upper()
         elif (not hook or hook == "Tips Edukasi Penting Hari Ini") and not line.startswith("[") and not line.startswith("#"):
             hook = line
-        elif len(line) > 2 and line[0].isdigit() and (line == "." or line == "."):
+        elif len(line) > 2 and line[0].isdigit() and (line == "." or line == ")"):
             points.append(line)
 
     if not points:
-        points = ["Fokus pada eksekusi konsisten", "Evaluasi hasil secara teratur", "Bangun sistem yang terukur"]
+        points = ["Fokus pada eksekusi konsisten", "Evaluasi arus kas secara teratur", "Bangun sistem bisnis yang terukur"]
 
     return badge, hook, points
 
 def create_slide_image(badge: str, title: str, body_lines: list, footer_sub: str, output_path: str):
-    """Merender kartu gambar berdesain modern dengan dark overlay elegan."""
+    """Merender kartu gambar modern dengan dark overlay elegan."""
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     
@@ -85,7 +104,7 @@ def create_slide_image(badge: str, title: str, body_lines: list, footer_sub: str
     except Exception:
         bg = Image.new("RGB", (W, H), (15, 23, 42))
 
-    # Dark overlay (75% kegelapan agar teks putih terbaca sangat tajam)
+    # Dark overlay elegan
     overlay = Image.new("RGBA", (W, H), (10, 15, 26, 195))
     bg.paste(overlay, (0, 0), overlay)
     draw = ImageDraw.Draw(bg)
@@ -98,10 +117,10 @@ def create_slide_image(badge: str, title: str, body_lines: list, footer_sub: str
     f_body = ImageFont.truetype(font_reg, 36)
     f_footer = ImageFont.truetype(font_bold, 28)
 
-    # 1. Badge Kategori (Pill Rounded Box)
+    # 1. Badge Kategori
     badge_label = f"  {badge}  "
-    bbox = draw.textbbox((0, 0), badge_label, font=f_badge)
-    bw, bh = bbox - bbox[0], bbox - bbox
+    l, t, r, b = draw.textbbox((0, 0), badge_label, font=f_badge)
+    bw, bh = r - l, b - t
     bx = (W - bw) // 2
     by = 130
     draw.rounded_rectangle([bx - 24, by - 12, bx + bw + 24, by + bh + 14], radius=24, fill=(13, 148, 136))
@@ -110,10 +129,10 @@ def create_slide_image(badge: str, title: str, body_lines: list, footer_sub: str
     # 2. Judul / Hook
     t_lines = textwrap.wrap(title, width=28)
     ty = by + bh + 80
-    for l in t_lines:
-        t_bbox = draw.textbbox((0, 0), l, font=f_title)
-        tw = t_bbox - t_bbox[0]
-        draw.text(((W - tw) // 2, ty), l, font=f_title, fill=(255, 255, 255))
+    for line in t_lines:
+        l, t, r, b = draw.textbbox((0, 0), line, font=f_title)
+        tw = r - l
+        draw.text(((W - tw) // 2, ty), line, font=f_title, fill=(255, 255, 255))
         ty += 68
 
     # 3. Garis Aksen Pembatas
@@ -121,27 +140,27 @@ def create_slide_image(badge: str, title: str, body_lines: list, footer_sub: str
     draw.line([(W // 2 - 60, ty), (W // 2 + 60, ty)], fill=(13, 148, 136), width=4)
     ty += 50
 
-    # 4. Poin-Poin Materi / Isi
+    # 4. Poin-Poin Materi
     for item in body_lines:
         s_lines = textwrap.wrap(item, width=38)
         for sl in s_lines:
-            s_bbox = draw.textbbox((0, 0), sl, font=f_body)
-            sw = s_bbox - s_bbox[0]
+            l, t, r, b = draw.textbbox((0, 0), sl, font=f_body)
+            sw = r - l
             draw.text(((W - sw) // 2, ty), sl, font=f_body, fill=(226, 232, 240))
             ty += 52
         ty += 24
 
     # 5. Footer Branding
     footer_text = f"@ishak_radjab  •  {footer_sub}"
-    ft_bbox = draw.textbbox((0, 0), footer_text, font=f_footer)
-    fw = ft_bbox - ft_bbox[0]
+    l, t, r, b = draw.textbbox((0, 0), footer_text, font=f_footer)
+    fw = r - l
     draw.text(((W - fw) // 2, H - 110), footer_text, font=f_footer, fill=(148, 163, 184))
 
     bg.save(output_path, "JPEG", quality=95)
-    print(f"🖼️ Berhasil merender kartu gambar: {output_path}")
+    print(f"🖼️ Berhasil merender kartu: {output_path}")
 
 def upload_to_catbox(file_path: str) -> str:
-    """Mengunggah file gambar ke hosting publik Catbox agar mendapat link HTTPS langsung."""
+    """Mengunggah kartu ke hosting Catbox untuk tautan gambar publik langsung."""
     url = "https://catbox.moe/user/api.php"
     with open(file_path, "rb") as f:
         files = {"fileToUpload": (os.path.basename(file_path), f, "image/jpeg")}
@@ -210,7 +229,7 @@ def main():
 
         # Slide 3: Poin 3 & Penutup
         p3 = "/tmp/slides/slide3.jpg"
-        create_slide_image(badge, "Langkah Tindakan (Aksi Nyata)", points[2:] + ["Ketik 'SETUJU' di komentar jika artikel ini bermanfaat!"], "Simpan Postingan Ini 📌", p3)
+        create_slide_image(badge, "Langkah Tindakan (Aksi Nyata)", points[2:] + ["Ketik 'SETUJU' di komentar jika konten ini bermanfaat!"], "Simpan Postingan Ini 📌", p3)
         slide_urls.append(upload_to_catbox(p3))
 
         new_post["carousel_urls"] = slide_urls
