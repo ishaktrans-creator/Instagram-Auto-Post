@@ -6,17 +6,18 @@ on:
       topic:
         description: 'Topik Konten yang Ingin Dibuat'
         required: true
-        default: 'Kesalahan fatal mengelola keuangan bisnis kecil'
+        default: '3 Kesalahan Fatal Mengelola Keuangan Bisnis Kecil'
       media_type:
-        description: 'Tipe Media (IMAGE atau REELS)'
+        description: 'Tipe Media (CAROUSEL, IMAGE, atau REELS)'
         required: true
-        default: 'IMAGE'
+        default: 'CAROUSEL'
         type: choice
         options:
+          - CAROUSEL
           - IMAGE
           - REELS
       media_url:
-        description: 'Tautan Gambar atau Video MP4 (Opsional)'
+        description: 'Tautan Video (Khusus REELS saja)'
         required: false
         default: ''
 
@@ -51,5 +52,5 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add content/posts.json
-          git commit -m "feat: add new AI-generated draft [skip ci]"
+          git commit -m "feat: add new AI-generated visual draft [skip ci]"
           git push
