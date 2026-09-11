@@ -38,11 +38,13 @@
   {
     "id": "post-008",
     "caption": "[FINANCE BISNIS]\nOmzet ratusan juta tapi uangnya selalu \"misterius\" hilang entah ke mana? Bisa jadi bisnismu sedang digerogoti oleh",
-    "status": "PENDING",
+    "status": "PUBLISHED",
     "carousel_urls": [
       "https://iili.io/nfYFWSp.jpg",
       "https://iili.io/nfYK4EJ.jpg",
       "https://iili.io/nfYBTzP.jpg"
-    ]
+    ],
+    "published_id": "18083332745694298",
+    "published_at": "2026-09-11T20:56:14.611230+08:00"
   }
 ]
