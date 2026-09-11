@@ -2,6 +2,9 @@ import os
 import json
 import requests
 import sys
+import textwrap
+from io import BytesIO
+from PIL import Image, ImageDraw, ImageFont
 
 # Bersihkan API Key dari spasi atau tanda kutip
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip().strip('"').strip("'")
@@ -21,13 +24,18 @@ Format output WAJIB mengikuti struktur ini secara berurutan:
 PENTING: Jangan tambahkan kata pengantar, salam pembuka, atau penjelasan apa pun. Tulis langsung teks caption-nya dari baris pertama hingga baris terakhir.
 """
 
-# Model resmi terbaru dari Google AI
-MODELS_TO_TRY = ["models/gemini-3.6-flash", "models/gemini-2.5-flash", "models/gemini-2.0-flash"]
+THEMATIC_BACKGROUNDS = {
+    "FINANCE": "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=1080&h=1080&fit=crop&q=80",
+    "TIPS BISNIS": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1080&h=1080&fit=crop&q=80",
+    "MOTIVATIONAL": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&h=1080&fit=crop&q=80"
+}
 
 def generate_caption(topic: str) -> str:
     if not GEMINI_API_KEY:
         raise Exception("Kunci GEMINI_API_KEY belum terpasang di GitHub Secrets.")
 
+    model_name = "models/gemini-3.6-flash"
+    url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{
             "parts": [{"text": PROMPT_TEMPLATE.format(topic=topic)}]
@@ -38,29 +46,116 @@ def generate_caption(topic: str) -> str:
         }
     }
     
-    last_error = None
-    for model in MODELS_TO_TRY:
-        print(f"🚀 Menghubungi Google Model: {model}...")
-        url = f"https://generativelanguage.googleapis.com/v1beta/{model}:generateContent?key={GEMINI_API_KEY}"
-        res = requests.post(url, json=payload)
-        data = res.json()
+    res = requests.post(url, json=payload).json()
+    if "candidates" not in res or not res["candidates"]:
+        raise Exception(f"Gagal generate konten dari Gemini: {res}")
         
-        if "candidates" in data and data["candidates"]:
-            # Menggabungkan seluruh bagian teks agar kalimat tidak terpotong
-            parts = data["candidates"][0]["content"].get("parts", [])
-            full_caption = "".join([p.get("text", "") for p in parts]).strip()
-            return full_caption
-        else:
-            last_error = data
+    parts = res["candidates"][0]["content"].get("parts", [])
+    return "".join([p.get("text", "") for p in parts]).strip()
 
-    raise Exception(f"Gagal generate konten dari Gemini: {last_error}")
+def parse_content(caption: str):
+    """Ekstraksi badge, hook, dan poin materi dari teks AI."""
+    lines = [l.strip() for l in caption.split("\n") if l.strip()]
+    badge = "TIPS BISNIS"
+    hook = "Tips Edukasi Penting Hari Ini"
+    points = []
+
+    for line in lines:
+        if line.startswith("[") and "]" in line:
+            badge = line[1:line.find("]")].strip().upper()
+        elif (not hook or hook == "Tips Edukasi Penting Hari Ini") and not line.startswith("[") and not line.startswith("#"):
+            hook = line
+        elif len(line) > 2 and line[0].isdigit() and (line == "." or line == "."):
+            points.append(line)
+
+    if not points:
+        points = ["Fokus pada eksekusi konsisten", "Evaluasi hasil secara teratur", "Bangun sistem yang terukur"]
+
+    return badge, hook, points
+
+def create_slide_image(badge: str, title: str, body_lines: list, footer_sub: str, output_path: str):
+    """Merender kartu gambar berdesain modern dengan dark overlay elegan."""
+    W, H = 1080, 1080
+    bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
+    
+    # Ambil background foto
+    try:
+        r = requests.get(bg_url, timeout=10)
+        bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
+    except Exception:
+        bg = Image.new("RGB", (W, H), (15, 23, 42))
+
+    # Dark overlay (75% kegelapan agar teks putih terbaca sangat tajam)
+    overlay = Image.new("RGBA", (W, H), (10, 15, 26, 195))
+    bg.paste(overlay, (0, 0), overlay)
+    draw = ImageDraw.Draw(bg)
+
+    font_bold = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    font_reg = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+
+    f_badge = ImageFont.truetype(font_bold, 30)
+    f_title = ImageFont.truetype(font_bold, 52)
+    f_body = ImageFont.truetype(font_reg, 36)
+    f_footer = ImageFont.truetype(font_bold, 28)
+
+    # 1. Badge Kategori (Pill Rounded Box)
+    badge_label = f"  {badge}  "
+    bbox = draw.textbbox((0, 0), badge_label, font=f_badge)
+    bw, bh = bbox - bbox[0], bbox - bbox
+    bx = (W - bw) // 2
+    by = 130
+    draw.rounded_rectangle([bx - 24, by - 12, bx + bw + 24, by + bh + 14], radius=24, fill=(13, 148, 136))
+    draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
+
+    # 2. Judul / Hook
+    t_lines = textwrap.wrap(title, width=28)
+    ty = by + bh + 80
+    for l in t_lines:
+        t_bbox = draw.textbbox((0, 0), l, font=f_title)
+        tw = t_bbox - t_bbox[0]
+        draw.text(((W - tw) // 2, ty), l, font=f_title, fill=(255, 255, 255))
+        ty += 68
+
+    # 3. Garis Aksen Pembatas
+    ty += 25
+    draw.line([(W // 2 - 60, ty), (W // 2 + 60, ty)], fill=(13, 148, 136), width=4)
+    ty += 50
+
+    # 4. Poin-Poin Materi / Isi
+    for item in body_lines:
+        s_lines = textwrap.wrap(item, width=38)
+        for sl in s_lines:
+            s_bbox = draw.textbbox((0, 0), sl, font=f_body)
+            sw = s_bbox - s_bbox[0]
+            draw.text(((W - sw) // 2, ty), sl, font=f_body, fill=(226, 232, 240))
+            ty += 52
+        ty += 24
+
+    # 5. Footer Branding
+    footer_text = f"@ishak_radjab  •  {footer_sub}"
+    ft_bbox = draw.textbbox((0, 0), footer_text, font=f_footer)
+    fw = ft_bbox - ft_bbox[0]
+    draw.text(((W - fw) // 2, H - 110), footer_text, font=f_footer, fill=(148, 163, 184))
+
+    bg.save(output_path, "JPEG", quality=95)
+    print(f"🖼️ Berhasil merender kartu gambar: {output_path}")
+
+def upload_to_catbox(file_path: str) -> str:
+    """Mengunggah file gambar ke hosting publik Catbox agar mendapat link HTTPS langsung."""
+    url = "https://catbox.moe/user/api.php"
+    with open(file_path, "rb") as f:
+        files = {"fileToUpload": (os.path.basename(file_path), f, "image/jpeg")}
+        data = {"reqtype": "fileupload"}
+        res = requests.post(url, data=data, files=files, timeout=30)
+        if res.status_code == 200 and res.text.startswith("http"):
+            return res.text.strip()
+    raise Exception(f"Gagal mengunggah gambar ke cloud: {res.text}")
 
 def main():
     topic = "Strategi membangun aset digital dan otomasi bisnis untuk pemula"
     media_url = ""
-    media_type = "IMAGE"
+    media_type = "CAROUSEL"
 
-    # Ambil argumen secara aman
     args = sys.argv[1:]
     if args:
         val = args.pop(0).strip()
@@ -77,10 +172,10 @@ def main():
 
     print(f"🤖 Meminta Gemini AI menulis konten tentang: '{topic}'...")
     caption = generate_caption(topic)
-    print("✅ Caption lengkap berhasil dibuat oleh AI!\n")
-    print("--- PRATINJAU KONTEN LENGKAP ---")
-    print(caption)
-    print("--------------------------------\n")
+    print("✅ Caption berhasil dibuat oleh AI!\n")
+
+    badge, hook, points = parse_content(caption)
+    os.makedirs("/tmp/slides", exist_ok=True)
 
     if os.path.exists(POST_FILE):
         with open(POST_FILE, "r", encoding="utf-8") as f:
@@ -98,10 +193,37 @@ def main():
         "status": "PENDING"
     }
 
-    if media_type.upper() == "REELS":
-        new_post["video_url"] = media_url
-    else:
-        new_post["image_url"] = media_url if media_url else "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080&q=80"
+    # PEMBUATAN ASET VISUAL OTOMATIS
+    if media_type.upper() == "CAROUSEL":
+        print("🎨 Merancang 3 Slide Karosel Edukasi...")
+        slide_urls = []
+        
+        # Slide 1: Cover
+        p1 = "/tmp/slides/slide1.jpg"
+        create_slide_image(badge, hook, ["Geser ke kiri untuk baca selengkapnya ➡️"], "Mahir Digital", p1)
+        slide_urls.append(upload_to_catbox(p1))
+        
+        # Slide 2: Poin 1 & 2
+        p2 = "/tmp/slides/slide2.jpg"
+        create_slide_image(badge, "Pembahasan Materi (Bagian 1)", points[:2], "Geser ke Slide Terakhir ➡️", p2)
+        slide_urls.append(upload_to_catbox(p2))
+
+        # Slide 3: Poin 3 & Penutup
+        p3 = "/tmp/slides/slide3.jpg"
+        create_slide_image(badge, "Langkah Tindakan (Aksi Nyata)", points[2:] + ["Ketik 'SETUJU' di komentar jika artikel ini bermanfaat!"], "Simpan Postingan Ini 📌", p3)
+        slide_urls.append(upload_to_catbox(p3))
+
+        new_post["carousel_urls"] = slide_urls
+        print(f"✅ 3 Slide Karosel berhasil diunggah: {slide_urls}")
+
+    elif media_type.upper() == "IMAGE":
+        print("🎨 Merancang 1 Kartu Gambar Infografis...")
+        p = "/tmp/slides/single.jpg"
+        create_slide_image(badge, hook, points, "Mahir Digital", p)
+        new_post["image_url"] = upload_to_catbox(p)
+
+    elif media_type.upper() == "REELS":
+        new_post["video_url"] = media_url if media_url else "https://files.catbox.moe/ez3k5w.mp4"
 
     posts.append(new_post)
 
@@ -109,7 +231,7 @@ def main():
     with open(POST_FILE, "w", encoding="utf-8") as f:
         json.dump(posts, f, indent=2, ensure_ascii=False)
 
-    print(f"🎉 Berhasil menambahkan draf baru ({new_id}) ke posts.json dengan status PENDING!")
+    print(f"🎉 Sukses! Draf visual lengkap ({new_id}) tersimpan di posts.json bertanda PENDING!")
 
 if __name__ == "__main__":
     main()
