@@ -31,6 +31,8 @@
       "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1080&h=1080&fit=crop&q=80",
       "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&h=1080&fit=crop&q=80"
     ],
-    "status": "PENDING"
+    "status": "PUBLISHED",
+    "published_id": "18108437924169882",
+    "published_at": "2026-09-11T20:18:56.213739+08:00"
   }
 ]
