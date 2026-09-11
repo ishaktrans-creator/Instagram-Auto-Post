@@ -14,15 +14,14 @@ if ":" in raw_token:
 ACCESS_TOKEN = raw_token
 
 IG_USER_ID = os.getenv("IG_USER_ID", "").strip()
-FB_PAGE_ID = os.getenv("FB_PAGE_ID", "").strip()
 GRAPH_API_URL = "https://graph.facebook.com/v21.0"
 
-# Kredensial Telegram (Opsional)
+# Kredensial Notifikasi Telegram (Opsional)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 
 def send_telegram_notification(message: str):
-    """Kirim notifikasi ringkas ke Telegram jika token tersedia."""
+    """Kirim notifikasi ke Telegram jika token tersedia."""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return
     try:
@@ -37,9 +36,9 @@ def create_instagram_container(post: dict) -> str:
     url = f"{GRAPH_API_URL}/{IG_USER_ID}/media"
     caption = post.get("caption", "")
 
-    # Mode 1: Karosel (Banyak Slide Gambar)
+    # Mode 1: Karosel (Multi-Slide Gambar)
     if "carousel_urls" in post and isinstance(post["carousel_urls"], list) and len(post["carousel_urls"]) > 1:
-        print(f"Mendaftarkan Karosel Instagram ({len(post['carousel_urls'])} slide)...")
+        print(f"📸 Mendaftarkan Karosel Instagram ({len(post['carousel_urls'])} slide)...")
         children_ids = []
         for img_url in post["carousel_urls"]:
             child_payload = {
@@ -64,9 +63,9 @@ def create_instagram_container(post: dict) -> str:
             raise Exception(f"Gagal membuat container karosel: {res}")
         return res["id"]
 
-    # Mode 2: Video Reels Vertikal
+    # Mode 2: Video Reels Vertikal (9:16)
     elif "video_url" in post and post["video_url"]:
-        print("Mendaftarkan media tipe: REELS...")
+        print("🎬 Mendaftarkan media tipe: REELS...")
         payload = {
             "media_type": "REELS",
             "video_url": post["video_url"],
@@ -79,9 +78,9 @@ def create_instagram_container(post: dict) -> str:
             raise Exception(f"Gagal membuat container Reels: {res}")
         return res["id"]
 
-    # Mode 3: Foto Tunggal
+    # Mode 3: Foto Tunggal Feed
     else:
-        print("Mendaftarkan media tipe: IMAGE...")
+        print("🖼️ Mendaftarkan media tipe: IMAGE...")
         payload = {
             "image_url": post.get("image_url", ""),
             "caption": caption,
@@ -118,45 +117,6 @@ def publish_to_instagram(container_id: str) -> str:
         raise Exception(f"Gagal publish ke Instagram: {res}")
     return res["id"]
 
-def publish_to_facebook_page(post: dict) -> str:
-    """Menerbitkan postingan ke Halaman Facebook Mahir Digital (Cross-Posting)."""
-    if not FB_PAGE_ID:
-        print("⚠️ Catatan: FB_PAGE_ID tidak ditemukan di environment/secrets.")
-        return ""
-
-    caption = post.get("caption", "")
-    print(f"📄 Menghubungi Facebook Page ID: {FB_PAGE_ID}...")
-
-    # 1. Jika Video
-    if "video_url" in post and post["video_url"]:
-        url = f"{GRAPH_API_URL}/{FB_PAGE_ID}/videos"
-        payload = {"file_url": post["video_url"], "description": caption, "access_token": ACCESS_TOKEN}
-        res = requests.post(url, params=payload).json()
-        if "id" in res:
-            return res["id"]
-        raise Exception(f"Facebook Video Error: {res}")
-
-    # 2. Jika Karosel (Kirim Slide Pertama ke Facebook Page)
-    elif "carousel_urls" in post and post["carousel_urls"]:
-        url = f"{GRAPH_API_URL}/{FB_PAGE_ID}/photos"
-        first_img = post["carousel_urls"][0]
-        payload = {"url": first_img, "caption": caption, "access_token": ACCESS_TOKEN}
-        res = requests.post(url, params=payload).json()
-        if "id" in res:
-            return res["id"]
-        raise Exception(f"Facebook Carousel Error: {res}")
-
-    # 3. Jika Gambar Tunggal
-    elif "image_url" in post and post["image_url"]:
-        url = f"{GRAPH_API_URL}/{FB_PAGE_ID}/photos"
-        payload = {"url": post["image_url"], "caption": caption, "access_token": ACCESS_TOKEN}
-        res = requests.post(url, params=payload).json()
-        if "id" in res:
-            return res["id"]
-        raise Exception(f"Facebook Photo Error: {res}")
-
-    return ""
-
 def main():
     post_file = "content/posts.json"
     if not os.path.exists(post_file):
@@ -174,41 +134,33 @@ def main():
             post_id = post.get("id")
             print(f"🚀 Memproses antrean: {post_id}...")
             try:
-                # 1. Instagram Posting
+                # 1. Buat Container Media Instagram
                 container_id = create_instagram_container(post)
+                
+                # 2. Jika Video, tunggu sampai proses encoding Meta selesai
                 if "video_url" in post and post["video_url"]:
                     print("Menunggu encoding Reels...")
                     wait_for_media_ready(container_id)
                 else:
                     time.sleep(5)
 
+                # 3. Publikasikan ke Feed / Reels
                 ig_post_id = publish_to_instagram(container_id)
                 print(f"✅ Sukses tayang di Instagram! Post ID: {ig_post_id}")
-
-                # 2. Cross-Posting ke Facebook Page
-                fb_post_id = ""
-                try:
-                    fb_post_id = publish_to_facebook_page(post)
-                    if fb_post_id:
-                        print(f"✅ Sukses cross-post ke Facebook Page! FB Post ID: {fb_post_id}")
-                except Exception as fb_err:
-                    print(f"⚠️ Catatan: Gagal cross-post ke FB (tetap lanjut): {fb_err}")
 
                 # Update status
                 post["status"] = "PUBLISHED"
                 post["published_id"] = ig_post_id
-                post["fb_published_id"] = fb_post_id
                 post["published_at"] = now.isoformat()
                 if "error_message" in post:
                     del post["error_message"]
                 updated = True
 
-                # Notifikasi Telegram
+                # Kirim notifikasi Telegram (jika aktif)
                 send_telegram_notification(
-                    f"🎉 *Postingan Berhasil Terbit!*\n\n"
+                    f"🎉 *Postingan Instagram Berhasil Terbit!*\n\n"
                     f"📌 *ID*: `{post_id}`\n"
-                    f"📸 *Instagram*: [Lihat di IG](https://www.instagram.com/ishak_radjab/)\n"
-                    f"📄 *Facebook*: Mahir Digital\n"
+                    f"📸 *Tautan*: [Lihat di Instagram](https://www.instagram.com/ishak_radjab/)\n"
                     f"⏰ *Waktu*: {now.strftime('%d-%m-%Y %H:%M:%S')} WITA"
                 )
                 break
@@ -217,7 +169,7 @@ def main():
                 post["status"] = "FAILED"
                 post["error_message"] = str(e)
                 updated = True
-                send_telegram_notification(f"⚠️ *Postingan Gagal!*\n\n📌 *ID*: `{post_id}`\n❌ *Error*: `{e}`")
+                send_telegram_notification(f"⚠️ *Postingan Instagram Gagal!*\n\n📌 *ID*: `{post_id}`\n❌ *Error*: `{e}`")
                 break
 
     if updated:
