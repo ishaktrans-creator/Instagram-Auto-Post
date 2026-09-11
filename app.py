@@ -81,7 +81,6 @@ def generate_caption_ai(topic: str) -> str:
         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1000}
     }
 
-    # Coba hingga 3 kali dengan batas waktu 60 detik
     for attempt in range(1, 4):
         try:
             res = requests.post(url, json=payload, timeout=60).json()
@@ -98,7 +97,7 @@ def generate_caption_ai(topic: str) -> str:
             if attempt < 3:
                 time.sleep(2)
                 continue
-            st.error("Koneksi ke server Google AI melebihi batas waktu (Timeout). Silakan coba klik tombol kembali.")
+            st.error("Koneksi ke server Google AI melebihi batas waktu (Timeout).")
         except Exception as e:
             if attempt < 3:
                 time.sleep(2)
@@ -257,7 +256,8 @@ with tab1:
             for idx, (col, slide_img) in enumerate(zip(cols, st.session_state["rendered_slides"]), 1):
                 with col:
                     st.caption(f"Slide {idx}")
-                    st.image(slide_img, use_column_width=True)
+                    # Parameter modern: use_container_width=True
+                    st.image(slide_img, use_container_width=True)
         with st.expander("📝 Lihat Naskah Caption Lengkap", expanded=True):
             caption_edited = st.text_area("Anda bisa mengedit caption di sini sebelum disimpan:", value=st.session_state["generated_caption"], height=200)
         if st.button("💾 Simpan ke Antrean Terjadwal (posts.json)", type="secondary"):
