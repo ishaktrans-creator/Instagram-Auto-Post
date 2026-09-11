@@ -10,10 +10,9 @@ import zoneinfo
 from PIL import Image, ImageDraw, ImageFont
 import streamlit as st
 
-# Konfigurasi Halaman Web Dashboard
 st.set_page_config(
-    page_title="AutoPost Studio - Instagram AI & Automation",
-    page_icon="📸",
+    page_title="AutoPost Studio - Enterprise Instagram Automation",
+    page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -22,7 +21,6 @@ LOCAL_TZ = zoneinfo.ZoneInfo("Asia/Makassar")
 POST_FILE = "content/posts.json"
 GRAPH_API_URL = "https://graph.facebook.com/v21.0"
 
-# Membaca Kredensial dari Streamlit Secrets atau Environment Variables
 def get_secret(key, default=""):
     if hasattr(st, "secrets") and key in st.secrets:
         return str(st.secrets[key]).strip().strip('"').strip("'")
@@ -31,6 +29,107 @@ def get_secret(key, default=""):
 GEMINI_API_KEY = get_secret("GEMINI_API_KEY")
 META_ACCESS_TOKEN = get_secret("META_ACCESS_TOKEN")
 IG_USER_ID = get_secret("IG_USER_ID")
+
+# Inject Custom High-End SaaS CSS
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+}
+
+/* Deep Obsidian Background */
+.stApp {
+    background: radial-gradient(circle at 50% 0%, #171E31 0%, #0B0F19 65%, #06080E 100%) !important;
+    color: #F8FAFC !important;
+}
+
+/* Glassmorphism Sidebar */
+[data-testid="stSidebar"] {
+    background: rgba(13, 18, 30, 0.9) !important;
+    backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Primary Button Styling */
+button[kind="primary"] {
+    background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #EC4899 100%) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 12px !important;
+    padding: 12px 28px !important;
+    font-weight: 700 !important;
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4) !important;
+    transition: all 0.3s ease !important;
+}
+
+button[kind="primary"]:hover {
+    box-shadow: 0 6px 28px rgba(236, 72, 153, 0.5) !important;
+    transform: translateY(-2px);
+}
+
+/* Secondary Button Styling */
+button[kind="secondary"] {
+    background: rgba(30, 41, 59, 0.8) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: #F8FAFC !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+}
+
+button[kind="secondary"]:hover {
+    background: rgba(51, 65, 85, 0.9) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Modern Form Inputs */
+.stTextInput>div>div, .stTextArea>div>div, .stSelectbox>div>div {
+    background: rgba(15, 23, 42, 0.75) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 12px !important;
+    color: #F8FAFC !important;
+}
+
+.stTextInput>div>div:focus-within, .stTextArea>div>div:focus-within {
+    border-color: #818CF8 !important;
+    box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.25) !important;
+}
+
+/* Custom Tabs */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+    background: rgba(15, 23, 42, 0.6);
+    padding: 6px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 24px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    border-radius: 10px;
+    color: #94A3B8;
+    font-weight: 600;
+    padding: 10px 20px;
+}
+
+.stTabs [aria-selected="true"] {
+    background: rgba(99, 102, 241, 0.2) !important;
+    color: #818CF8 !important;
+    border: 1px solid rgba(99, 102, 241, 0.3) !important;
+}
+
+/* Metrics Cards */
+[data-testid="stMetric"] {
+    background: rgba(18, 24, 38, 0.6) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 16px 20px;
+    backdrop-filter: blur(12px);
+}
+</style>
+""", unsafe_allow_html=True)
 
 PROMPT_TEMPLATE = """
 Bertindaklah sebagai Content Strategist & Copywriter Senior untuk Instagram bisnis dan edukasi.
@@ -199,40 +298,90 @@ def upload_image_cloud(pil_img):
         pass
     return ""
 
-# ==================== TAMPILAN DASHBOARD ====================
-
+# ==================== SIDEBAR BRANDING ====================
 with st.sidebar:
-    st.image("https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&h=200&fit=crop", width=80)
-    st.title("AutoPost Studio")
-    st.caption("Platform Otomasi Konten & Distribusi Instagram")
-    st.markdown("---")
-    st.subheader("Profil Terhubung")
-    st.success("Instagram: **@ishak_radjab**")
-    st.info(f"Target ID: `{IG_USER_ID if IG_USER_ID else '17841469560294881'}`")
-    branding_handle = st.text_input("Footer Branding", value="@ishak_radjab")
-    st.markdown("---")
-    st.caption("Jadwal Rutin: **09:00 & 17:00 WITA**")
+    # High-End Modern Vector Logo
+    st.markdown("""
+    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 24px; padding: 4px 0;">
+      <div style="width: 50px; height: 50px; border-radius: 14px; background: linear-gradient(135deg, #6366F1, #EC4899); padding: 2px; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 24px rgba(99, 102, 241, 0.4);">
+        <div style="width: 100%; height: 100%; background: #0B0F19; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#logo-grad)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <defs>
+              <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#818CF8" />
+                <stop offset="100%" stop-color="#F472B6" />
+              </linearGradient>
+            </defs>
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+      </div>
+      <div>
+        <div style="font-size: 21px; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, #FFFFFF, #C7D2FE); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">AutoPost<span style="color: #818CF8;">.ai</span></div>
+        <div style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.08em; text-transform: uppercase;">Enterprise Studio</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style="background: rgba(18, 24, 38, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 16px; margin-bottom: 20px;">
+      <div style="font-size: 11px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Akun Instagram Terhubung</div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 10px; height: 10px; border-radius: 50%; background: #22C55E; box-shadow: 0 0 10px #22C55E;"></div>
+        <div style="font-size: 15px; font-weight: 700; color: #FFFFFF;">@ishak_radjab</div>
+      </div>
+      <div style="font-size: 12px; color: #64748B; margin-top: 6px;">Target ID: 17841469560294881</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    branding_handle = st.text_input("Branding Footer Gambar", value="@ishak_radjab")
+    
+    st.markdown("""
+    <div style="background: rgba(18, 24, 38, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 14px; margin-top: 24px;">
+      <div style="font-size: 12px; color: #94A3B8;">⏰ <b>Jadwal Publikasi:</b></div>
+      <div style="font-size: 13px; color: #818CF8; font-weight: 600; margin-top: 4px;">09:00 & 17:00 WITA</div>
+      <div style="font-size: 11px; color: #64748B; margin-top: 4px;">Serverless Cloud Runner</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-st.title("📸 Instagram Content Automation Dashboard")
-st.markdown("Kelola pembuatan materi berbasis AI, tinjau kartu visual (*mockup*), dan pantau jadwal penerbitan secara terpusat.")
+# ==================== MAIN BANNER ====================
+st.markdown("""
+<div style="background: rgba(18, 24, 38, 0.65); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px; padding: 28px 32px; margin-bottom: 24px; box-shadow: 0 12px 40px rgba(0,0,0,0.35);">
+  <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.3); padding: 5px 14px; border-radius: 20px; margin-bottom: 14px;">
+    <span style="width: 8px; height: 8px; border-radius: 50%; background: #818CF8; box-shadow: 0 0 10px #818CF8;"></span>
+    <span style="font-size: 11px; font-weight: 700; color: #A5B4FC; letter-spacing: 0.06em; text-transform: uppercase;">Autonomous B2B Content Engine</span>
+  </div>
+  <h1 style="font-size: 32px; font-weight: 800; margin: 0; background: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 50%, #94A3B8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.03em;">
+    Instagram Content Automation Dashboard
+  </h1>
+  <p style="font-size: 14px; color: #94A3B8; margin: 8px 0 0 0; line-height: 1.6;">
+    Platform orkestrasi konten otomatis: copywriting cerdas dengan Gemini AI, generator desain visual beresolusi tinggi, dan manajemen antrean cloud mandiri.
+  </p>
+</div>
+""", unsafe_allow_html=True)
 
 tab1, tab2, tab3 = st.tabs(["✨ AI Content Studio", "📅 Antrean & Kalender Jadwal", "⚙️ Status Sistem & Kredensial"])
 
 with tab1:
-    st.subheader("Buat Materi & Render Desain Visual")
+    st.markdown("""
+    <div style="font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 12px;">Studio Pembuatan Konten</div>
+    """, unsafe_allow_html=True)
+    
     col_input, col_config = st.columns(2)
     with col_input:
         topic_input = st.text_area(
             "Topik Konten atau Ide Bisnis",
             value="3 Cara Melipatgandakan Omzet Usaha Tanpa Tambah Modal Besar",
-            help="Tuliskan topik apa pun, AI akan menyusun hook, edukasi, CTA, dan hashtag."
+            help="Tuliskan ide apa pun, AI akan menyusun hook, edukasi, CTA, dan hashtag."
         )
     with col_config:
-        media_type = st.selectbox("Format Konten", ["CAROUSEL (3 Slide)", "IMAGE (1 Foto)", "REELS (Video)"])
+        media_type = st.selectbox("Format Konten Media", ["CAROUSEL (3 Slide)", "IMAGE (1 Foto)", "REELS (Video)"])
         custom_media = st.text_input("Link Media Khusus (Opsional)", placeholder="https://...")
     
     if st.button("🚀 Buat Materi & Render Desain Visual", type="primary"):
-        with st.spinner("Gemini AI sedang menulis materi & mesin grafis merender desain visual..."):
+        with st.spinner("Gemini AI sedang menyusun materi & mesin grafis merender desain visual..."):
             caption = generate_caption_ai(topic_input)
             if caption:
                 st.session_state["generated_caption"] = caption
@@ -250,18 +399,22 @@ with tab1:
 
     if "generated_caption" in st.session_state:
         st.markdown("---")
-        st.subheader("Pratinjau Hasil Desain (*Live Mockup*)")
+        st.markdown("""
+        <div style="font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 16px;">Pratinjau Hasil Desain (Live Mockup)</div>
+        """, unsafe_allow_html=True)
+        
         if "rendered_slides" in st.session_state and st.session_state["rendered_slides"]:
             cols = st.columns(len(st.session_state["rendered_slides"]))
             for idx, (col, slide_img) in enumerate(zip(cols, st.session_state["rendered_slides"]), 1):
                 with col:
-                    st.caption(f"Slide {idx}")
-                    # Parameter modern: use_container_width=True
+                    st.markdown(f"<div style='font-size: 13px; font-weight: 600; color: #818CF8; margin-bottom: 6px;'>Slide {idx}</div>", unsafe_allow_html=True)
                     st.image(slide_img, use_container_width=True)
-        with st.expander("📝 Lihat Naskah Caption Lengkap", expanded=True):
-            caption_edited = st.text_area("Anda bisa mengedit caption di sini sebelum disimpan:", value=st.session_state["generated_caption"], height=200)
+        
+        with st.expander("📝 Tinjau & Edit Naskah Caption", expanded=True):
+            caption_edited = st.text_area("Naskah Caption Siap Terbit:", value=st.session_state["generated_caption"], height=180)
+        
         if st.button("💾 Simpan ke Antrean Terjadwal (posts.json)", type="secondary"):
-            with st.spinner("Mengunggah aset visual dan menyimpan antrean..."):
+            with st.spinner("Mengunggah aset visual ke cloud dan memperbarui antrean..."):
                 posts = load_posts()
                 new_id = f"post-{len(posts) + 1:03d}"
                 new_entry = {
@@ -281,17 +434,22 @@ with tab1:
                 st.success(f"🎉 Sukses! Draf `{new_id}` berhasil dimasukkan ke antrean posts.json bertanda PENDING!")
 
 with tab2:
-    st.subheader("Manajemen Antrean Konten (*Content Queue*)")
+    st.markdown("""
+    <div style="font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 12px;">Manajemen Antrean & Kalender Jadwal</div>
+    """, unsafe_allow_html=True)
     posts = load_posts()
+    
     total = len(posts)
     pending = sum(1 for p in posts if p.get("status") == "PENDING")
     published = sum(1 for p in posts if p.get("status") == "PUBLISHED")
     failed = sum(1 for p in posts if p.get("status") == "FAILED")
+    
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Total Draf", total)
     m2.metric("Siap Tayang (PENDING)", pending)
     m3.metric("Berhasil Terbit", published)
-    m4.metric("Gagal / Perlu Review", failed)
+    m4.metric("Perlu Review (FAILED)", failed)
+    
     st.markdown("---")
     if not posts:
         st.info("Belum ada postingan di dalam antrean.")
@@ -326,12 +484,15 @@ with tab2:
                 st.divider()
 
 with tab3:
-    st.subheader("Status Koneksi & Kesehatan API")
+    st.markdown("""
+    <div style="font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 12px;">Kesehatan API & Parameter Sistem</div>
+    """, unsafe_allow_html=True)
+    
     k1, k2, k3 = st.columns(3)
     with k1:
         st.write("🔑 **Meta Access Token**")
         if META_ACCESS_TOKEN:
-            st.success("Tersambung (Terkonfigurasi)")
+            st.success("Terkonfigurasi (Aktif)")
         else:
             st.error("Tidak Ditemukan")
     with k2:
@@ -341,10 +502,10 @@ with tab3:
         else:
             st.error("Tidak Ditemukan")
     with k3:
-        st.write("🤖 **Gemini 3.6 Flash API**")
+        st.write("🤖 **Gemini 3.6 Flash Engine**")
         if GEMINI_API_KEY:
-            st.success("Aktif & Siap Pakai")
+            st.success("Online & Siap Pakai")
         else:
             st.error("Tidak Ditemukan")
     st.markdown("---")
-    st.info("💡 **Tips:** Dasbor ini terhubung langsung ke antrean posts.json Anda dan siap digunakan untuk demonstrasi ke calon klien.")
+    st.info("💡 Dasbor ini terhubung secara real-time ke sistem otomasi cloud GitHub Actions Anda.")
