@@ -34,5 +34,15 @@
     "status": "PUBLISHED",
     "published_id": "18108437924169882",
     "published_at": "2026-09-11T20:18:56.213739+08:00"
+  },
+  {
+    "id": "post-008",
+    "caption": "[FINANCE BISNIS]\nOmzet ratusan juta tapi uangnya selalu \"misterius\" hilang entah ke mana? Bisa jadi bisnismu sedang digerogoti oleh",
+    "status": "PENDING",
+    "carousel_urls": [
+      "https://iili.io/nfYFWSp.jpg",
+      "https://iili.io/nfYK4EJ.jpg",
+      "https://iili.io/nfYBTzP.jpg"
+    ]
   }
 ]
