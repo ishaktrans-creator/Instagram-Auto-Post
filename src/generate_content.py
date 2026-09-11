@@ -31,6 +31,8 @@ THEMATIC_BACKGROUNDS = {
     "MOTIVATIONAL": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&h=1080&fit=crop&q=80"
 }
 
+MODELS_TO_TRY = ["models/gemini-3.6-flash", "models/gemini-2.5-flash", "models/gemini-2.0-flash"]
+
 def generate_caption(topic: str) -> str:
     if not GEMINI_API_KEY:
         raise Exception("Kunci GEMINI_API_KEY belum terpasang di GitHub Secrets.")
@@ -90,8 +92,8 @@ def parse_content(caption: str):
 
     return badge, hook, points
 
-def create_slide_image(badge: str, title: str, body_lines: list, footer_sub: str, output_path: str):
-    """Merender kartu gambar berdesain modern dengan dark overlay elegan."""
+def create_slide_image(badge: str, title: str, body_lines: list, output_path: str):
+    """Merender kartu gambar berdesain modern dengan footer branding hanya @ishak_radjab."""
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     
@@ -101,6 +103,7 @@ def create_slide_image(badge: str, title: str, body_lines: list, footer_sub: str
     except Exception:
         bg = Image.new("RGB", (W, H), (15, 23, 42))
 
+    # Dark overlay elegan (75% opacity)
     overlay = Image.new("RGBA", (W, H), (10, 15, 26, 195))
     bg.paste(overlay, (0, 0), overlay)
     draw = ImageDraw.Draw(bg)
@@ -111,7 +114,7 @@ def create_slide_image(badge: str, title: str, body_lines: list, footer_sub: str
     f_badge = ImageFont.truetype(font_bold, 30)
     f_title = ImageFont.truetype(font_bold, 52)
     f_body = ImageFont.truetype(font_reg, 36)
-    f_footer = ImageFont.truetype(font_bold, 28)
+    f_footer = ImageFont.truetype(font_bold, 30)
 
     # 1. Badge Kategori
     badge_label = f"  {badge}  "
@@ -146,8 +149,8 @@ def create_slide_image(badge: str, title: str, body_lines: list, footer_sub: str
             ty += 52
         ty += 24
 
-    # 5. Footer Branding
-    footer_text = f"@ishak_radjab  •  {footer_sub}"
+    # 5. Footer Branding Eksklusif: Hanya @ishak_radjab
+    footer_text = "@ishak_radjab"
     l, t, r, b = draw.textbbox((0, 0), footer_text, font=f_footer)
     fw = r - l
     draw.text(((W - fw) // 2, H - 110), footer_text, font=f_footer, fill=(148, 163, 184))
@@ -157,7 +160,6 @@ def create_slide_image(badge: str, title: str, body_lines: list, footer_sub: str
 
 def upload_image_to_cloud(file_path: str) -> str:
     """Mengunggah kartu ke cloud dengan sistem multi-server fallback (Litterbox/Freeimage/Tmpfiles)."""
-    # 1. Coba Litterbox (Catbox Temporary Engine)
     try:
         url = "https://litterbox.catbox.moe/resources/internals/api.php"
         with open(file_path, "rb") as f:
@@ -169,7 +171,6 @@ def upload_image_to_cloud(file_path: str) -> str:
     except Exception as e:
         print(f"Litterbox error: {e}")
 
-    # 2. Coba Freeimage.host (Cadangan 1)
     try:
         url = "https://freeimage.host/api/1/upload"
         with open(file_path, "rb") as f:
@@ -181,7 +182,6 @@ def upload_image_to_cloud(file_path: str) -> str:
     except Exception as e:
         print(f"Freeimage error: {e}")
 
-    # 3. Coba Tmpfiles.org (Cadangan 2)
     try:
         url = "https://tmpfiles.org/api/v1/upload"
         with open(file_path, "rb") as f:
@@ -243,17 +243,17 @@ def main():
         
         # Slide 1: Cover
         p1 = "/tmp/slides/slide1.jpg"
-        create_slide_image(badge, hook, ["Geser ke kiri untuk baca selengkapnya ➡️"], "Mahir Digital", p1)
+        create_slide_image(badge, hook, ["Geser ke kiri untuk baca selengkapnya ➡️"], p1)
         slide_urls.append(upload_image_to_cloud(p1))
         
         # Slide 2: Poin 1 & 2
         p2 = "/tmp/slides/slide2.jpg"
-        create_slide_image(badge, "Pembahasan Materi (Bagian 1)", points[:2], "Geser ke Slide Terakhir ➡️", p2)
+        create_slide_image(badge, "Pembahasan Materi (Bagian 1)", points[:2], p2)
         slide_urls.append(upload_image_to_cloud(p2))
 
         # Slide 3: Poin 3 & Penutup
         p3 = "/tmp/slides/slide3.jpg"
-        create_slide_image(badge, "Langkah Tindakan (Aksi Nyata)", points[2:] + ["Ketik 'SETUJU' di komentar jika konten ini bermanfaat!"], "Simpan Postingan Ini 📌", p3)
+        create_slide_image(badge, "Langkah Tindakan (Aksi Nyata)", points[2:] + ["Ketik 'SETUJU' di komentar jika konten ini bermanfaat!"], p3)
         slide_urls.append(upload_image_to_cloud(p3))
 
         new_post["carousel_urls"] = slide_urls
@@ -262,7 +262,7 @@ def main():
     elif media_type.upper() == "IMAGE":
         print("🎨 Merancang 1 Kartu Gambar Infografis...")
         p = "/tmp/slides/single.jpg"
-        create_slide_image(badge, hook, points, "Mahir Digital", p)
+        create_slide_image(badge, hook, points, p)
         new_post["image_url"] = upload_image_to_cloud(p)
 
     elif media_type.upper() == "REELS":
