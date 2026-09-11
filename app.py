@@ -24,7 +24,7 @@ GRAPH_API_URL = "https://graph.facebook.com/v21.0"
 
 # Membaca Kredensial dari Streamlit Secrets atau Environment Variables
 def get_secret(key, default=""):
-    if key in st.secrets:
+    if hasattr(st, "secrets") and key in st.secrets:
         return str(st.secrets[key]).strip().strip('"').strip("'")
     return os.getenv(key, default).strip().strip('"').strip("'")
 
@@ -52,7 +52,6 @@ THEMATIC_BACKGROUNDS = {
     "MOTIVATIONAL": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&h=1080&fit=crop&q=80"
 }
 
-# Fungsi Pembantu Backend
 def load_posts():
     if not os.path.exists(POST_FILE):
         return []
@@ -73,22 +72,25 @@ def save_posts(posts):
 
 def generate_caption_ai(topic: str) -> str:
     if not GEMINI_API_KEY:
-        st.error("Kunci GEMINI_API_KEY belum dikonfigurasi.")
+        st.error("Kunci GEMINI_API_KEY belum dikonfigurasi di Streamlit Secrets.")
         return ""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{"parts": [{"text": PROMPT_TEMPLATE.format(topic=topic)}]}],
         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1000}
     }
-    res = requests.post(url, json=payload, timeout=30).json()
-    if "candidates" in res and res["candidates"]:
-        parts = res["candidates"][0]["content"].get("parts", [])
-        return "".join([p.get("text", "") for p in parts]).strip()
-    st.error(f"Gagal generate dari Gemini: {res}")
+    try:
+        res = requests.post(url, json=payload, timeout=30).json()
+        if "candidates" in res and res["candidates"]:
+            parts = res["candidates"][0]["content"].get("parts", [])
+            return "".join([p.get("text", "") for p in parts]).strip()
+        st.error(f"Gagal generate dari Gemini: {res}")
+    except Exception as e:
+        st.error(f"Koneksi ke Gemini error: {e}")
     return ""
 
 def parse_content(caption: str):
-    lines = [l.strip() for l in caption.split("\n") if l.strip()]
+    lines = [l.strip() for l in caption.splitlines() if l.strip()]
     badge = "TIPS BISNIS"
     hook = "Tips Edukasi Penting Hari Ini"
     points = []
@@ -126,7 +128,6 @@ def render_slide_image(badge: str, title: str, body_lines: list, footer_text: st
     except Exception:
         f_badge = f_title = f_body = f_footer = ImageFont.load_default()
 
-    # 1. Badge
     badge_label = f"  {badge}  "
     l, t, r, b = draw.textbbox((0, 0), badge_label, font=f_badge)
     bw, bh = r - l, b - t
@@ -135,7 +136,6 @@ def render_slide_image(badge: str, title: str, body_lines: list, footer_text: st
     draw.rounded_rectangle([bx - 24, by - 12, bx + bw + 24, by + bh + 14], radius=24, fill=(13, 148, 136))
     draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
 
-    # 2. Hook Title
     t_lines = textwrap.wrap(title, width=28)
     ty = by + bh + 80
     for line in t_lines:
@@ -144,12 +144,10 @@ def render_slide_image(badge: str, title: str, body_lines: list, footer_text: st
         draw.text(((W - tw) // 2, ty), line, font=f_title, fill=(255, 255, 255))
         ty += 68
 
-    # 3. Garis Divider
     ty += 25
     draw.line([(W // 2 - 60, ty), (W // 2 + 60, ty)], fill=(13, 148, 136), width=4)
     ty += 50
 
-    # 4. Poin-poin Materi
     for item in body_lines:
         s_lines = textwrap.wrap(item, width=38)
         for sl in s_lines:
@@ -159,7 +157,6 @@ def render_slide_image(badge: str, title: str, body_lines: list, footer_text: st
             ty += 52
         ty += 24
 
-    # 5. Footer Branding
     l, t, r, b = draw.textbbox((0, 0), footer_text, font=f_footer)
     fw = r - l
     draw.text(((W - fw) // 2, H - 110), footer_text, font=f_footer, fill=(148, 163, 184))
@@ -171,16 +168,12 @@ def upload_image_cloud(pil_img):
     pil_img.save(buf, format="JPEG", quality=95)
     buf.seek(0)
     files = {"fileToUpload": ("slide.jpg", buf, "image/jpeg")}
-    
-    # Coba Litterbox
     try:
         r = requests.post("https://litterbox.catbox.moe/resources/internals/api.php", data={"reqtype": "fileupload", "time": "72h"}, files=files, timeout=25)
         if r.status_code == 200 and r.text.strip().startswith("http"):
             return r.text.strip()
     except Exception:
         pass
-    
-    # Fallback Freeimage
     buf.seek(0)
     try:
         r = requests.post("https://freeimage.host/api/1/upload", data={"key": "6d207e02198a847aa98d0a2a901485a5", "action": "upload", "format": "json"}, files={"source": ("slide.jpg", buf, "image/jpeg")}, timeout=25).json()
@@ -192,31 +185,27 @@ def upload_image_cloud(pil_img):
 
 # ==================== TAMPILAN DASHBOARD ====================
 
-# Sidebar Navigasi & Info Akun
 with st.sidebar:
     st.image("https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&h=200&fit=crop", width=80)
     st.title("AutoPost Studio")
     st.caption("Platform Otomasi Konten & Distribusi Instagram")
     st.markdown("---")
-    
     st.subheader("Profil Terhubung")
     st.success("Instagram: **@ishak_radjab**")
-    st.info(f"Target ID: `{IG_USER_ID if IG_USER_ID else 'Belum terhubung'}`")
-    
+    st.info(f"Target ID: `{IG_USER_ID if IG_USER_ID else '17841469560294881'}`")
     branding_handle = st.text_input("Footer Branding", value="@ishak_radjab")
     st.markdown("---")
     st.caption("Jadwal Rutin: **09:00 & 17:00 WITA**")
 
-# Header Utama
 st.title("📸 Instagram Content Automation Dashboard")
 st.markdown("Kelola pembuatan materi berbasis AI, tinjau kartu visual (*mockup*), dan pantau jadwal penerbitan secara terpusat.")
 
 tab1, tab2, tab3 = st.tabs(["✨ AI Content Studio", "📅 Antrean & Kalender Jadwal", "⚙️ Status Sistem & Kredensial"])
 
-# TAB 1: AI CONTENT STUDIO
 with tab1:
     st.subheader("Buat Materi & Render Desain Visual")
     
+    # Perbaikan: spec kolom ditentukan dengan
     col_input, col_config = st.columns()
     with col_input:
         topic_input = st.text_area(
@@ -234,8 +223,6 @@ with tab1:
             if caption:
                 st.session_state["generated_caption"] = caption
                 badge, hook, points = parse_content(caption)
-                
-                # Render Slide
                 if "CAROUSEL" in media_type:
                     s1 = render_slide_image(badge, hook, ["Geser ke kiri untuk baca selengkapnya ➡️"], branding_handle)
                     s2 = render_slide_image(badge, "Pembahasan Materi (Bagian 1)", points[:2], branding_handle)
@@ -247,24 +234,17 @@ with tab1:
                 else:
                     st.session_state["rendered_slides"] = []
 
-    # Area Pratinjau Live
     if "generated_caption" in st.session_state:
         st.markdown("---")
         st.subheader("Pratinjau Hasil Desain (*Live Mockup*)")
-        
-        # Tampilkan Gambar Slide
         if "rendered_slides" in st.session_state and st.session_state["rendered_slides"]:
             cols = st.columns(len(st.session_state["rendered_slides"]))
             for idx, (col, slide_img) in enumerate(zip(cols, st.session_state["rendered_slides"]), 1):
                 with col:
                     st.caption(f"Slide {idx}")
                     st.image(slide_img, use_column_width=True)
-        
-        # Tampilkan Teks Caption
         with st.expander("📝 Lihat Naskah Caption Lengkap", expanded=True):
             caption_edited = st.text_area("Anda bisa mengedit caption di sini sebelum disimpan:", value=st.session_state["generated_caption"], height=200)
-        
-        # Tombol Simpan ke Antrean
         if st.button("💾 Simpan ke Antrean Terjadwal (posts.json)", type="secondary"):
             with st.spinner("Mengunggah aset visual dan menyimpan antrean..."):
                 posts = load_posts()
@@ -274,7 +254,6 @@ with tab1:
                     "caption": caption_edited,
                     "status": "PENDING"
                 }
-                
                 if "CAROUSEL" in media_type:
                     urls = [upload_image_cloud(img) for img in st.session_state["rendered_slides"]]
                     new_entry["carousel_urls"] = urls
@@ -282,17 +261,13 @@ with tab1:
                     new_entry["image_url"] = upload_image_cloud(st.session_state["rendered_slides"][0])
                 elif "REELS" in media_type:
                     new_entry["video_url"] = custom_media if custom_media else "https://files.catbox.moe/ez3k5w.mp4"
-                
                 posts.append(new_entry)
                 save_posts(posts)
                 st.success(f"🎉 Sukses! Draf `{new_id}` berhasil dimasukkan ke antrean posts.json bertanda PENDING!")
 
-# TAB 2: ANTREAN & KALENDER JADWAL
 with tab2:
     st.subheader("Manajemen Antrean Konten (*Content Queue*)")
     posts = load_posts()
-    
-    # Metrik Ringkas
     total = len(posts)
     pending = sum(1 for p in posts if p.get("status") == "PENDING")
     published = sum(1 for p in posts if p.get("status") == "PUBLISHED")
@@ -305,7 +280,6 @@ with tab2:
     m4.metric("Gagal / Perlu Review", failed)
     
     st.markdown("---")
-    
     if not posts:
         st.info("Belum ada postingan di dalam antrean.")
     else:
@@ -338,10 +312,8 @@ with tab2:
                             st.rerun()
                 st.divider()
 
-# TAB 3: STATUS SISTEM & KREDENSIAL
 with tab3:
     st.subheader("Status Koneksi & Kesehatan API")
-    
     k1, k2, k3 = st.columns(3)
     with k1:
         st.write("🔑 **Meta Access Token**")
@@ -349,20 +321,17 @@ with tab3:
             st.success("Tersambung (Terkonfigurasi)")
         else:
             st.error("Tidak Ditemukan")
-            
     with k2:
         st.write("📸 **Instagram Business ID**")
         if IG_USER_ID:
             st.success(f"ID: `{IG_USER_ID}`")
         else:
             st.error("Tidak Ditemukan")
-            
     with k3:
         st.write("🤖 **Gemini 3.6 Flash API**")
         if GEMINI_API_KEY:
             st.success("Aktif & Siap Pakai")
         else:
             st.error("Tidak Ditemukan")
-            
     st.markdown("---")
-    st.info("💡 **Tips Deployment Cloud Gratis:** Anda dapat menghubungkan repository ini ke [share.streamlit.io](https://share.streamlit.io/) untuk mendapatkan link web publik mandiri yang bisa diakses dari HP atau laptop klien.")
+    st.info("💡 **Tips:** Dasbor ini terhubung langsung ke antrean posts.json Anda dan siap digunakan untuk demonstrasi ke calon klien.")
