@@ -31,7 +31,6 @@ THEMATIC_BACKGROUNDS = {
     "MOTIVATIONAL": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&h=1080&fit=crop&q=80"
 }
 
-# Daftar model untuk penanganan failover 503 otomatis
 MODELS_TO_TRY = ["models/gemini-3.6-flash", "models/gemini-2.5-flash", "models/gemini-2.0-flash"]
 
 def generate_caption(topic: str) -> str:
@@ -53,7 +52,6 @@ def generate_caption(topic: str) -> str:
         print(f"🚀 Menghubungi model: {model_name}...")
         url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={GEMINI_API_KEY}"
         
-        # Coba hingga 2 kali per model jika terjadi lonjakan 503
         for attempt in range(2):
             try:
                 res = requests.post(url, json=payload, timeout=25).json()
@@ -61,7 +59,7 @@ def generate_caption(topic: str) -> str:
                     parts = res["candidates"][0]["content"].get("parts", [])
                     return "".join([p.get("text", "") for p in parts]).strip()
                 elif "error" in res and res["error"].get("code") == 503:
-                    print(f"⚠️ Model {model_name} sedang sibuk (503). Menunggu 3 detik...")
+                    print(f"⚠️ Model {model_name} sibuk (503). Menunggu 3 detik...")
                     time.sleep(3)
                 else:
                     last_error = res
@@ -70,7 +68,7 @@ def generate_caption(topic: str) -> str:
                 last_error = str(net_err)
                 time.sleep(2)
 
-    raise Exception(f"Gagal generate konten dari Gemini setelah mencoba model cadangan: {last_error}")
+    raise Exception(f"Gagal generate konten dari Gemini: {last_error}")
 
 def parse_content(caption: str):
     """Ekstraksi badge, hook, dan poin materi dari teks AI."""
@@ -93,18 +91,16 @@ def parse_content(caption: str):
     return badge, hook, points
 
 def create_slide_image(badge: str, title: str, body_lines: list, footer_sub: str, output_path: str):
-    """Merender kartu gambar modern dengan dark overlay elegan."""
+    """Merender kartu gambar berdesain modern dengan dark overlay elegan."""
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     
-    # Ambil background foto
     try:
         r = requests.get(bg_url, timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
         bg = Image.new("RGB", (W, H), (15, 23, 42))
 
-    # Dark overlay elegan
     overlay = Image.new("RGBA", (W, H), (10, 15, 26, 195))
     bg.paste(overlay, (0, 0), overlay)
     draw = ImageDraw.Draw(bg)
@@ -159,16 +155,44 @@ def create_slide_image(badge: str, title: str, body_lines: list, footer_sub: str
     bg.save(output_path, "JPEG", quality=95)
     print(f"🖼️ Berhasil merender kartu: {output_path}")
 
-def upload_to_catbox(file_path: str) -> str:
-    """Mengunggah kartu ke hosting Catbox untuk tautan gambar publik langsung."""
-    url = "https://catbox.moe/user/api.php"
-    with open(file_path, "rb") as f:
-        files = {"fileToUpload": (os.path.basename(file_path), f, "image/jpeg")}
-        data = {"reqtype": "fileupload"}
-        res = requests.post(url, data=data, files=files, timeout=30)
-        if res.status_code == 200 and res.text.startswith("http"):
-            return res.text.strip()
-    raise Exception(f"Gagal mengunggah gambar ke cloud: {res.text}")
+def upload_image_to_cloud(file_path: str) -> str:
+    """Mengunggah kartu ke cloud dengan sistem multi-server fallback (Litterbox/Freeimage/Tmpfiles)."""
+    # 1. Coba Litterbox (Catbox Temporary Engine)
+    try:
+        url = "https://litterbox.catbox.moe/resources/internals/api.php"
+        with open(file_path, "rb") as f:
+            files = {"fileToUpload": (os.path.basename(file_path), f, "image/jpeg")}
+            data = {"reqtype": "fileupload", "time": "72h"}
+            res = requests.post(url, data=data, files=files, timeout=25)
+            if res.status_code == 200 and res.text.strip().startswith("http"):
+                return res.text.strip()
+    except Exception as e:
+        print(f"Litterbox error: {e}")
+
+    # 2. Coba Freeimage.host (Cadangan 1)
+    try:
+        url = "https://freeimage.host/api/1/upload"
+        with open(file_path, "rb") as f:
+            data = {"key": "6d207e02198a847aa98d0a2a901485a5", "action": "upload", "format": "json"}
+            files = {"source": (os.path.basename(file_path), f, "image/jpeg")}
+            res = requests.post(url, data=data, files=files, timeout=25).json()
+            if "image" in res and "url" in res["image"]:
+                return res["image"]["url"]
+    except Exception as e:
+        print(f"Freeimage error: {e}")
+
+    # 3. Coba Tmpfiles.org (Cadangan 2)
+    try:
+        url = "https://tmpfiles.org/api/v1/upload"
+        with open(file_path, "rb") as f:
+            files = {"file": (os.path.basename(file_path), f, "image/jpeg")}
+            res = requests.post(url, files=files, timeout=25).json()
+            if "data" in res and "url" in res["data"]:
+                return res["data"]["url"].replace("tmpfiles.org/", "tmpfiles.org/dl/")
+    except Exception as e:
+        print(f"Tmpfiles error: {e}")
+
+    raise Exception("Gagal mengunggah gambar ke seluruh server cloud cadangan.")
 
 def main():
     topic = "Strategi membangun aset digital dan otomasi bisnis untuk pemula"
@@ -220,17 +244,17 @@ def main():
         # Slide 1: Cover
         p1 = "/tmp/slides/slide1.jpg"
         create_slide_image(badge, hook, ["Geser ke kiri untuk baca selengkapnya ➡️"], "Mahir Digital", p1)
-        slide_urls.append(upload_to_catbox(p1))
+        slide_urls.append(upload_image_to_cloud(p1))
         
         # Slide 2: Poin 1 & 2
         p2 = "/tmp/slides/slide2.jpg"
         create_slide_image(badge, "Pembahasan Materi (Bagian 1)", points[:2], "Geser ke Slide Terakhir ➡️", p2)
-        slide_urls.append(upload_to_catbox(p2))
+        slide_urls.append(upload_image_to_cloud(p2))
 
         # Slide 3: Poin 3 & Penutup
         p3 = "/tmp/slides/slide3.jpg"
         create_slide_image(badge, "Langkah Tindakan (Aksi Nyata)", points[2:] + ["Ketik 'SETUJU' di komentar jika konten ini bermanfaat!"], "Simpan Postingan Ini 📌", p3)
-        slide_urls.append(upload_to_catbox(p3))
+        slide_urls.append(upload_image_to_cloud(p3))
 
         new_post["carousel_urls"] = slide_urls
         print(f"✅ 3 Slide Karosel berhasil diunggah: {slide_urls}")
@@ -239,7 +263,7 @@ def main():
         print("🎨 Merancang 1 Kartu Gambar Infografis...")
         p = "/tmp/slides/single.jpg"
         create_slide_image(badge, hook, points, "Mahir Digital", p)
-        new_post["image_url"] = upload_to_catbox(p)
+        new_post["image_url"] = upload_image_to_cloud(p)
 
     elif media_type.upper() == "REELS":
         new_post["video_url"] = media_url if media_url else "https://files.catbox.moe/ez3k5w.mp4"
