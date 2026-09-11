@@ -74,19 +74,36 @@ def generate_caption_ai(topic: str) -> str:
     if not GEMINI_API_KEY:
         st.error("Kunci GEMINI_API_KEY belum dikonfigurasi di Streamlit Secrets.")
         return ""
+
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{"parts": [{"text": PROMPT_TEMPLATE.format(topic=topic)}]}],
         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1000}
     }
-    try:
-        res = requests.post(url, json=payload, timeout=30).json()
-        if "candidates" in res and res["candidates"]:
-            parts = res["candidates"][0]["content"].get("parts", [])
-            return "".join([p.get("text", "") for p in parts]).strip()
-        st.error(f"Gagal generate dari Gemini: {res}")
-    except Exception as e:
-        st.error(f"Koneksi ke Gemini error: {e}")
+
+    # Coba hingga 3 kali dengan batas waktu 60 detik
+    for attempt in range(1, 4):
+        try:
+            res = requests.post(url, json=payload, timeout=60).json()
+            if "candidates" in res and res["candidates"]:
+                parts = res["candidates"][0]["content"].get("parts", [])
+                return "".join([p.get("text", "") for p in parts]).strip()
+            elif "error" in res and res["error"].get("code") in [503, 429]:
+                time.sleep(3)
+                continue
+            else:
+                st.error(f"Respon Google AI: {res}")
+                return ""
+        except requests.exceptions.Timeout:
+            if attempt < 3:
+                time.sleep(2)
+                continue
+            st.error("Koneksi ke server Google AI melebihi batas waktu (Timeout). Silakan coba klik tombol kembali.")
+        except Exception as e:
+            if attempt < 3:
+                time.sleep(2)
+                continue
+            st.error(f"Koneksi ke Gemini error: {e}")
     return ""
 
 def parse_content(caption: str):
@@ -204,8 +221,6 @@ tab1, tab2, tab3 = st.tabs(["✨ AI Content Studio", "📅 Antrean & Kalender Ja
 
 with tab1:
     st.subheader("Buat Materi & Render Desain Visual")
-    
-    # Perbaikan: diberi angka 2 secara eksplisit
     col_input, col_config = st.columns(2)
     with col_input:
         topic_input = st.text_area(
