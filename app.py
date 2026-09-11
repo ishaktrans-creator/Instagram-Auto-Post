@@ -56,7 +56,7 @@ button[kind="primary"] {
     color: #FFFFFF !important;
     border: none !important;
     border-radius: 12px !important;
-    padding: 12px 28px !important;
+    padding: 10px 24px !important;
     font-weight: 700 !important;
     box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4) !important;
     transition: all 0.3s ease !important;
@@ -448,14 +448,18 @@ Format output WAJIB mengikuti struktur ini secara berurutan:
 PENTING: Jangan tambahkan kata pengantar atau basa-basi apa pun. Tulis langsung teks caption-nya dari baris pertama hingga terakhir.
 """
 
-def generate_caption_ai(topic: str) -> str:
+def generate_caption_ai(topic: str, revision_note: str = "") -> str:
     if not GEMINI_API_KEY:
         st.error("Kunci GEMINI_API_KEY belum dikonfigurasi di Streamlit Secrets.")
         return ""
 
+    final_prompt = PROMPT_TEMPLATE.format(topic=topic)
+    if revision_note:
+        final_prompt += f"\n\nCATATAN REVISI TAMBAHAN DARI PENGGUNA: Tolong sesuaikan materi dengan instruksi khusus ini: '{revision_note}'."
+
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
     payload = {
-        "contents": [{"parts": [{"text": PROMPT_TEMPLATE.format(topic=topic)}]}],
+        "contents": [{"parts": [{"text": final_prompt}]}],
         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1000}
     }
 
@@ -484,7 +488,6 @@ def generate_caption_ai(topic: str) -> str:
     return ""
 
 def research_30_ideas_ai(niche_name: str) -> list:
-    """Meriset 30 ide baru dengan Gemini AI secara terstruktur."""
     if not GEMINI_API_KEY:
         st.error("Kunci GEMINI_API_KEY belum dikonfigurasi.")
         return []
@@ -541,6 +544,20 @@ def parse_content(caption: str):
         points = ["Fokus pada eksekusi konsisten", "Evaluasi arus kas secara teratur", "Bangun sistem bisnis yang terukur"]
     return badge, hook, points
 
+def get_scalable_font(size: int, bold: bool = False):
+    candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf" if bold else "/usr/share/fonts/truetype/freefont/FreeSans.ttf"
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size)
+            except Exception:
+                pass
+    return ImageFont.load_default(size=size)
+
 def render_slide_image(badge: str, title: str, body_lines: list, footer_text: str):
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
@@ -554,16 +571,12 @@ def render_slide_image(badge: str, title: str, body_lines: list, footer_text: st
     bg.paste(overlay, (0, 0), overlay)
     draw = ImageDraw.Draw(bg)
 
-    font_bold = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    font_reg = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-    try:
-        f_badge = ImageFont.truetype(font_bold, 30)
-        f_title = ImageFont.truetype(font_bold, 52)
-        f_body = ImageFont.truetype(font_reg, 36)
-        f_footer = ImageFont.truetype(font_bold, 30)
-    except Exception:
-        f_badge = f_title = f_body = f_footer = ImageFont.load_default()
+    f_badge = get_scalable_font(30, bold=True)
+    f_title = get_scalable_font(52, bold=True)
+    f_body = get_scalable_font(36, bold=False)
+    f_footer = get_scalable_font(30, bold=True)
 
+    # 1. Badge Kategori
     badge_label = f"  {badge}  "
     l, t, r, b = draw.textbbox((0, 0), badge_label, font=f_badge)
     bw, bh = r - l, b - t
@@ -572,6 +585,7 @@ def render_slide_image(badge: str, title: str, body_lines: list, footer_text: st
     draw.rounded_rectangle([bx - 24, by - 12, bx + bw + 24, by + bh + 14], radius=24, fill=(13, 148, 136))
     draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
 
+    # 2. Judul / Hook
     t_lines = textwrap.wrap(title, width=28)
     ty = by + bh + 80
     for line in t_lines:
@@ -580,10 +594,12 @@ def render_slide_image(badge: str, title: str, body_lines: list, footer_text: st
         draw.text(((W - tw) // 2, ty), line, font=f_title, fill=(255, 255, 255))
         ty += 68
 
+    # 3. Garis Aksen Pembatas
     ty += 25
     draw.line([(W // 2 - 60, ty), (W // 2 + 60, ty)], fill=(13, 148, 136), width=4)
     ty += 50
 
+    # 4. Poin-Poin Materi
     for item in body_lines:
         s_lines = textwrap.wrap(item, width=38)
         for sl in s_lines:
@@ -698,7 +714,6 @@ with tab_ideas:
     <div style="font-size: 14px; color: #94A3B8; margin-bottom: 20px;">Pilih niche bisnis Anda, temukan ide konten harian, dan klik <b>Gunakan Ide Ini</b> untuk langsung memproses desain visualnya.</div>
     """, unsafe_allow_html=True)
 
-    # Perbaikan: diberi angka 2 secara eksplisit
     col_niche, col_ai_refresh = st.columns(2)
     with col_niche:
         niche_options = {v["name"]: k for k, v in niche_db.items()}
@@ -732,7 +747,6 @@ with tab_ideas:
     avail_ideas = sum(1 for i in current_ideas if i.get("status") == "Tersedia")
     used_ideas = total_ideas - avail_ideas
 
-    # Perbaikan: diberi angka 3 secara eksplisit
     c_met1, c_met2, c_met3 = st.columns(3)
     c_met1.metric("Total Kalender", f"{total_ideas} Hari")
     c_met2.metric("Ide Tersedia", avail_ideas)
@@ -753,7 +767,6 @@ with tab_ideas:
         sugg_fmt = item.get("suggested_format", "CAROUSEL")
         
         with st.container():
-            # Perbaikan: diberi angka 2 secara eksplisit
             col_info, col_act = st.columns(2)
             with col_info:
                 badge_color = "#22C55E" if item_status == "Tersedia" else "#64748B"
@@ -788,13 +801,12 @@ with tab_ideas:
 with tab_studio:
     st.markdown("""
     <div style="font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 4px;">Studio Pembuatan & Desain Konten</div>
-    <div style="font-size: 14px; color: #94A3B8; margin-bottom: 20px;">Tulis atau gunakan ide dari Bank Ide di atas, lalu biarkan AI meracik naskah dan merender kartu visualnya.</div>
+    <div style="font-size: 14px; color: #94A3B8; margin-bottom: 20px;">Tulis atau gunakan ide dari Bank Ide, lalu biarkan AI meracik naskah dan merender kartu visualnya.</div>
     """, unsafe_allow_html=True)
     
     initial_topic = st.session_state.get("selected_topic", "3 Cara Melipatgandakan Omzet Usaha Tanpa Tambah Modal Besar")
     initial_fmt = st.session_state.get("selected_media_type", "CAROUSEL (3 Slide)")
     
-    # Perbaikan: diberi angka 2 secara eksplisit
     col_input, col_config = st.columns(2)
     with col_input:
         topic_input = st.text_area(
@@ -826,24 +838,70 @@ with tab_studio:
                 else:
                     st.session_state["rendered_slides"] = []
 
+    # AREA PRATINJAU DENGAN UKURAN PROPORSIONAL & ALUR REVISI
     if "generated_caption" in st.session_state:
         st.markdown("---")
         st.markdown("""
-        <div style="font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 16px;">Pratinjau Hasil Desain (Live Mockup)</div>
+        <div style="font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 12px;">Pratinjau Hasil Desain (Ukuran Smartphone Mockup)</div>
         """, unsafe_allow_html=True)
         
+        # Tampilkan mockup slide dengan lebar proporsional (tidak raksasa)
         if "rendered_slides" in st.session_state and st.session_state["rendered_slides"]:
             cols = st.columns(len(st.session_state["rendered_slides"]))
             for idx, (col, slide_img) in enumerate(zip(cols, st.session_state["rendered_slides"]), 1):
                 with col:
-                    st.markdown(f"<div style='font-size: 13px; font-weight: 600; color: #818CF8; margin-bottom: 6px;'>Slide {idx}</div>", unsafe_allow_html=True)
-                    st.image(slide_img, use_container_width=True)
-        
-        with st.expander("📝 Tinjau & Edit Naskah Caption", expanded=True):
-            caption_edited = st.text_area("Naskah Caption Siap Terbit:", value=st.session_state["generated_caption"], height=180)
-        
-        if st.button("💾 Simpan ke Antrean Terjadwal (posts.json)", type="secondary"):
-            with st.spinner("Mengunggah aset visual ke cloud dan memperbarui antrean..."):
+                    st.markdown(f"<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 6px;'>SLIDE {idx}</div>", unsafe_allow_html=True)
+                    # Ukuran terkontrol 340px agar pas berdampingan
+                    st.image(slide_img, width=340)
+
+        # FITUR REVISI & EDIT NASKAH
+        st.markdown("<br>", unsafe_allow_html=True)
+        with st.expander("🛠️ Area Revisi & Penyempurnaan Naskah", expanded=True):
+            caption_edited = st.text_area(
+                "Naskah Caption (Anda bisa mengedit langsung teks di bawah ini):", 
+                value=st.session_state["generated_caption"], 
+                height=180
+            )
+            
+            col_rev1, col_rev2 = st.columns(2)
+            with col_rev1:
+                if st.button("🎨 Render Ulang Gambar Sesuai Editan Naskah", type="secondary"):
+                    with st.spinner("Memperbarui kartu gambar visual sesuai editan naskah Anda..."):
+                        badge, hook, points = parse_content(caption_edited)
+                        if "CAROUSEL" in media_type:
+                            s1 = render_slide_image(badge, hook, ["Geser ke kiri untuk baca selengkapnya ➡️"], branding_handle)
+                            s2 = render_slide_image(badge, "Pembahasan Materi (Bagian 1)", points[:2], branding_handle)
+                            s3 = render_slide_image(badge, "Langkah Tindakan (Aksi Nyata)", points[2:] + ["Ketik 'SETUJU' di komentar jika konten ini bermanfaat!"], branding_handle)
+                            st.session_state["rendered_slides"] = [s1, s2, s3]
+                        elif "IMAGE" in media_type:
+                            s = render_slide_image(badge, hook, points, branding_handle)
+                            st.session_state["rendered_slides"] = [s]
+                        st.session_state["generated_caption"] = caption_edited
+                        st.success("✅ Gambar visual berhasil diperbarui sesuai naskah editan!")
+                        st.rerun()
+
+            with col_rev2:
+                revision_note = st.text_input("Catatan revisi untuk AI (opsional)", placeholder="Contoh: Buat hook lebih tajam & singkat")
+                if st.button("🔄 Minta AI Buat Ulang (Revisi Otomatis)", type="secondary"):
+                    with st.spinner("Gemini AI sedang menulis ulang materi sesuai catatan revisi..."):
+                        new_cap = generate_caption_ai(topic_input, revision_note)
+                        if new_cap:
+                            st.session_state["generated_caption"] = new_cap
+                            badge, hook, points = parse_content(new_cap)
+                            if "CAROUSEL" in media_type:
+                                s1 = render_slide_image(badge, hook, ["Geser ke kiri untuk baca selengkapnya ➡️"], branding_handle)
+                                s2 = render_slide_image(badge, "Pembahasan Materi (Bagian 1)", points[:2], branding_handle)
+                                s3 = render_slide_image(badge, "Langkah Tindakan (Aksi Nyata)", points[2:] + ["Ketik 'SETUJU' di komentar jika konten ini bermanfaat!"], branding_handle)
+                                st.session_state["rendered_slides"] = [s1, s2, s3]
+                            elif "IMAGE" in media_type:
+                                s = render_slide_image(badge, hook, points, branding_handle)
+                                st.session_state["rendered_slides"] = [s]
+                            st.rerun()
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        # Tombol Final Simpan
+        if st.button("💾 Simpan ke Antrean Terjadwal (posts.json)", type="primary"):
+            with st.spinner("Mengunggah aset visual final ke cloud dan memperbarui antrean..."):
                 posts = load_posts()
                 new_id = f"post-{len(posts) + 1:03d}"
                 new_entry = {
@@ -860,7 +918,7 @@ with tab_studio:
                     new_entry["video_url"] = custom_media if custom_media else "[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)"
                 posts.append(new_entry)
                 save_posts(posts)
-                st.success(f"🎉 Sukses! Draf `{new_id}` berhasil dimasukkan ke antrean posts.json bertanda PENDING!")
+                st.success(f"🎉 Sukses! Draf final `{new_id}` berhasil dimasukkan ke antrean posts.json bertanda PENDING!")
 
 # ==================== TAB 3: ANTREAN & KALENDER ====================
 with tab_queue:
