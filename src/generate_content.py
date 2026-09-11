@@ -31,12 +31,13 @@ THEMATIC_BACKGROUNDS = {
     "MOTIVATIONAL": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1080&h=1080&fit=crop&q=80"
 }
 
-MODELS_TO_TRY = ["models/gemini-3.6-flash", "models/gemini-2.5-flash", "models/gemini-2.0-flash"]
-
 def generate_caption(topic: str) -> str:
     if not GEMINI_API_KEY:
         raise Exception("Kunci GEMINI_API_KEY belum terpasang di GitHub Secrets.")
 
+    model_name = "models/gemini-3.6-flash"
+    url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={GEMINI_API_KEY}"
+    
     payload = {
         "contents": [{
             "parts": [{"text": PROMPT_TEMPLATE.format(topic=topic)}]
@@ -46,29 +47,28 @@ def generate_caption(topic: str) -> str:
             "maxOutputTokens": 1000
         }
     }
-    
-    last_error = None
-    for model_name in MODELS_TO_TRY:
-        print(f"🚀 Menghubungi model: {model_name}...")
-        url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={GEMINI_API_KEY}"
-        
-        for attempt in range(2):
-            try:
-                res = requests.post(url, json=payload, timeout=25).json()
-                if "candidates" in res and res["candidates"]:
-                    parts = res["candidates"][0]["content"].get("parts", [])
-                    return "".join([p.get("text", "") for p in parts]).strip()
-                elif "error" in res and res["error"].get("code") == 503:
-                    print(f"⚠️ Model {model_name} sibuk (503). Menunggu 3 detik...")
-                    time.sleep(3)
-                else:
-                    last_error = res
-                    break
-            except Exception as net_err:
-                last_error = str(net_err)
-                time.sleep(2)
 
-    raise Exception(f"Gagal generate konten dari Gemini: {last_error}")
+    # Coba hingga 4 kali jika server Google sedang sibuk
+    last_response = None
+    for attempt in range(1, 5):
+        print(f"🚀 Menghubungi Google Gemini 3.6 Flash (Percobaan {attempt}/4)...")
+        try:
+            res = requests.post(url, json=payload, timeout=30).json()
+            last_response = res
+            
+            if "candidates" in res and res["candidates"]:
+                parts = res["candidates"][0]["content"].get("parts", [])
+                full_text = "".join([p.get("text", "") for p in parts]).strip()
+                if full_text:
+                    return full_text
+            
+            print(f"⚠️ Server Google sedang antre: {res.get('error', res)}. Menunggu 5 detik...")
+            time.sleep(5)
+        except Exception as e:
+            print(f"⚠️ Gangguan jaringan sementara: {e}. Menunggu 5 detik...")
+            time.sleep(5)
+
+    raise Exception(f"Gagal generate konten dari Gemini setelah 4 kali percobaan: {last_response}")
 
 def parse_content(caption: str):
     """Ekstraksi badge, hook, dan poin materi dari teks AI."""
