@@ -7,7 +7,7 @@ import zoneinfo
 
 LOCAL_TZ = zoneinfo.ZoneInfo("Asia/Makassar")
 
-# Sanitasi token
+# Sanitasi token Meta
 raw_token = os.getenv("META_ACCESS_TOKEN", "").strip().strip('"').strip("'")
 if ":" in raw_token:
     raw_token = raw_token.split(":")[-1].strip().strip('"').strip("'")
@@ -17,7 +17,7 @@ IG_USER_ID = os.getenv("IG_USER_ID", "").strip()
 FB_PAGE_ID = os.getenv("FB_PAGE_ID", "").strip()
 GRAPH_API_URL = "https://graph.facebook.com/v21.0"
 
-# Telegram Secrets (Opsional)
+# Kredensial Telegram (Opsional)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 
@@ -37,7 +37,7 @@ def create_instagram_container(post: dict) -> str:
     url = f"{GRAPH_API_URL}/{IG_USER_ID}/media"
     caption = post.get("caption", "")
 
-    # Mode 1: Karosel (Banyak Gambar)
+    # Mode 1: Karosel (Banyak Slide Gambar)
     if "carousel_urls" in post and isinstance(post["carousel_urls"], list) and len(post["carousel_urls"]) > 1:
         print(f"Mendaftarkan Karosel Instagram ({len(post['carousel_urls'])} slide)...")
         children_ids = []
@@ -64,7 +64,7 @@ def create_instagram_container(post: dict) -> str:
             raise Exception(f"Gagal membuat container karosel: {res}")
         return res["id"]
 
-    # Mode 2: Video Reels
+    # Mode 2: Video Reels Vertikal
     elif "video_url" in post and post["video_url"]:
         print("Mendaftarkan media tipe: REELS...")
         payload = {
@@ -127,7 +127,7 @@ def publish_to_facebook_page(post: dict) -> str:
     caption = post.get("caption", "")
     print(f"📄 Menghubungi Facebook Page ID: {FB_PAGE_ID}...")
 
-    # Jika Video
+    # 1. Jika Video
     if "video_url" in post and post["video_url"]:
         url = f"{GRAPH_API_URL}/{FB_PAGE_ID}/videos"
         payload = {"file_url": post["video_url"], "description": caption, "access_token": ACCESS_TOKEN}
@@ -135,7 +135,18 @@ def publish_to_facebook_page(post: dict) -> str:
         if "id" in res:
             return res["id"]
         raise Exception(f"Facebook Video Error: {res}")
-    # Jika Gambar
+
+    # 2. Jika Karosel (Kirim Slide Pertama ke Facebook Page)
+    elif "carousel_urls" in post and post["carousel_urls"]:
+        url = f"{GRAPH_API_URL}/{FB_PAGE_ID}/photos"
+        first_img = post["carousel_urls"][0]
+        payload = {"url": first_img, "caption": caption, "access_token": ACCESS_TOKEN}
+        res = requests.post(url, params=payload).json()
+        if "id" in res:
+            return res["id"]
+        raise Exception(f"Facebook Carousel Error: {res}")
+
+    # 3. Jika Gambar Tunggal
     elif "image_url" in post and post["image_url"]:
         url = f"{GRAPH_API_URL}/{FB_PAGE_ID}/photos"
         payload = {"url": post["image_url"], "caption": caption, "access_token": ACCESS_TOKEN}
