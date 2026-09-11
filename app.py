@@ -205,8 +205,8 @@ tab1, tab2, tab3 = st.tabs(["✨ AI Content Studio", "📅 Antrean & Kalender Ja
 with tab1:
     st.subheader("Buat Materi & Render Desain Visual")
     
-    # Perbaikan: spec kolom ditentukan dengan
-    col_input, col_config = st.columns()
+    # Perbaikan: diberi angka 2 secara eksplisit
+    col_input, col_config = st.columns(2)
     with col_input:
         topic_input = st.text_area(
             "Topik Konten atau Ide Bisnis",
@@ -272,13 +272,11 @@ with tab2:
     pending = sum(1 for p in posts if p.get("status") == "PENDING")
     published = sum(1 for p in posts if p.get("status") == "PUBLISHED")
     failed = sum(1 for p in posts if p.get("status") == "FAILED")
-    
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Total Draf", total)
     m2.metric("Siap Tayang (PENDING)", pending)
     m3.metric("Berhasil Terbit", published)
     m4.metric("Gagal / Perlu Review", failed)
-    
     st.markdown("---")
     if not posts:
         st.info("Belum ada postingan di dalam antrean.")
@@ -286,7 +284,7 @@ with tab2:
         for p in reversed(posts):
             status = p.get("status", "UNKNOWN")
             with st.container():
-                c1, c2, c3 = st.columns()
+                c1, c2, c3 = st.columns(3)
                 with c1:
                     st.write(f"**{p.get('id')}**")
                     if status == "PUBLISHED":
