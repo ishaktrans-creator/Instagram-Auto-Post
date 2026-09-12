@@ -596,19 +596,23 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     draw.rounded_rectangle([bx - 24, by - 12, bx + bw + 24, by + bh + 14], radius=24, fill=(13, 148, 136))
     draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
 
-    # Pisahkan Hook Utama (Besar) dan Sub-Hook (Kecil) agar proporsional
+    # Pemisahan Kalimat Aman Tanpa Error Indexing
     words = raw_hook.split()
     if "—" in raw_hook:
-        parts = raw_hook.split("—", 1)
-        main_title = parts[0].strip()
-        sub_text = parts.strip()
+        main_title, sub_text = raw_hook.split("—", 1)
+        main_title = main_title.strip()
+        sub_text = sub_text.strip()
     elif "-" in raw_hook and len(words) > 8:
-        parts = raw_hook.split("-", 1)
-        main_title = parts[0].strip()
-        sub_text = parts.strip()
+        main_title, sub_text = raw_hook.split("-", 1)
+        main_title = main_title.strip()
+        sub_text = sub_text.strip()
+    elif ":" in raw_hook:
+        main_title, sub_text = raw_hook.split(":", 1)
+        main_title = main_title.strip()
+        sub_text = sub_text.strip()
     elif len(words) > 8:
-        main_title = " ".join(words[:8])
-        sub_text = " ".join(words[8:])
+        main_title = " ".join(words[:7])
+        sub_text = " ".join(words[7:])
     else:
         main_title = raw_hook
         sub_text = "Geser slide ke kiri untuk membaca penjelasan lengkapnya! ➡️"
@@ -786,7 +790,7 @@ def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text
         draw.text((box_x1 + 32, curr_y), dl, font=f_point_body, fill=(203, 213, 225))
         curr_y += 38
 
-    # CTA Card Box (Glowing Accent Border)
+    # CTA Card Box
     cta_y1 = box_y2 + 40
     cta_lines = textwrap.wrap(cta_text.strip(), width=34)
     cta_h = 40 + 36 + len(cta_lines) * 42 + 20
@@ -1081,7 +1085,7 @@ with tab_studio:
                 if "CAROUSEL" in media_type:
                     s1 = render_cover_slide(badge, hook, branding_handle)
                     s2 = render_content_slide(badge, "Pondasi Utama yang Wajib Dibangun", points[:2], branding_handle)
-                    s3 = render_closing_slide(badge, points if len(points) > 2 else points[0], cta_text, branding_handle)
+                    s3 = render_closing_slide(badge, points[-1], cta_text, branding_handle)
                     st.session_state["rendered_slides"] = [s1, s2, s3]
                 elif "IMAGE" in media_type:
                     s = render_single_image(badge, hook, points, branding_handle)
@@ -1089,14 +1093,13 @@ with tab_studio:
                 else:
                     st.session_state["rendered_slides"] = []
 
-    # PRATINJAU DENGAN TATA LETAK MOCKUP PROPORSIONAL & FITUR REVISI
+    # PRATINJAU PROPORSIONAL DENGAN MOCKUP SMARTPHONE & FITUR REVISI
     if "generated_caption" in st.session_state:
         st.markdown("---")
         st.markdown("""
         <div style="font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 12px;">Pratinjau Hasil Desain (Smartphone Mockup)</div>
         """, unsafe_allow_html=True)
         
-        # Tampilkan mockup slide dengan ukuran proporsional (lebar ~320px)
         if "rendered_slides" in st.session_state and st.session_state["rendered_slides"]:
             if len(st.session_state["rendered_slides"]) > 1:
                 cols = st.columns(len(st.session_state["rendered_slides"]))
@@ -1105,12 +1108,12 @@ with tab_studio:
                         st.markdown(f"<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 8px;'>SLIDE {idx}</div>", unsafe_allow_html=True)
                         st.image(slide_img, width=320)
             else:
-                _, col_center, _ = st.columns()
+                col_left, col_center, col_right = st.columns()
                 with col_center:
                     st.markdown("<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 8px;'>PREVIEW POSTINGAN</div>", unsafe_allow_html=True)
                     st.image(st.session_state["rendered_slides"][0], width=380)
 
-        # FITUR REVISI & SUNTONGAN LANGSUNG
+        # FITUR REVISI & SUNTINGAN LANGSUNG
         st.markdown("<br>", unsafe_allow_html=True)
         with st.expander("🛠️ Area Revisi & Penyempurnaan Desain / Naskah", expanded=True):
             caption_edited = st.text_area(
@@ -1127,7 +1130,7 @@ with tab_studio:
                         if "CAROUSEL" in media_type:
                             s1 = render_cover_slide(badge, hook, branding_handle)
                             s2 = render_content_slide(badge, "Pondasi Utama yang Wajib Dibangun", points[:2], branding_handle)
-                            s3 = render_closing_slide(badge, points if len(points) > 2 else points[0], cta_text, branding_handle)
+                            s3 = render_closing_slide(badge, points[-1], cta_text, branding_handle)
                             st.session_state["rendered_slides"] = [s1, s2, s3]
                         elif "IMAGE" in media_type:
                             s = render_single_image(badge, hook, points, branding_handle)
@@ -1147,7 +1150,7 @@ with tab_studio:
                             if "CAROUSEL" in media_type:
                                 s1 = render_cover_slide(badge, hook, branding_handle)
                                 s2 = render_content_slide(badge, "Pondasi Utama yang Wajib Dibangun", points[:2], branding_handle)
-                                s3 = render_closing_slide(badge, points if len(points) > 2 else points[0], cta_text, branding_handle)
+                                s3 = render_closing_slide(badge, points[-1], cta_text, branding_handle)
                                 st.session_state["rendered_slides"] = [s1, s2, s3]
                             elif "IMAGE" in media_type:
                                 s = render_single_image(badge, hook, points, branding_handle)
