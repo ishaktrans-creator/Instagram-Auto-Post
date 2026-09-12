@@ -533,6 +533,8 @@ def parse_content(caption: str):
     badge = "TIPS BISNIS"
     hook = "Tips Edukasi Penting Hari Ini"
     points = []
+    cta_text = "Simak pembahasan lengkap dan bagikan pendapatmu di komentar!"
+
     for line in lines:
         if line.startswith("[") and "]" in line:
             badge = line[1:line.find("]")].strip().upper()
@@ -540,9 +542,16 @@ def parse_content(caption: str):
             hook = line
         elif len(line) > 2 and line[0].isdigit() and (line == "." or line == ")"):
             points.append(line)
+        elif line.lower().startswith("ketik") or "komentar" in line.lower():
+            cta_text = line
+
     if not points:
-        points = ["Fokus pada eksekusi konsisten", "Evaluasi arus kas secara teratur", "Bangun sistem bisnis yang terukur"]
-    return badge, hook, points
+        points = [
+            "1. Fokus Pada Eksekusi: Mulailah dari langkah nyata terkecil.",
+            "2. Evaluasi Arus Kas: Disiplin mencatat pemasukan dan pengeluaran.",
+            "3. Bangun Sistem: Otomasi alur kerja agar bisnis bertumbuh mandiri."
+        ]
+    return badge, hook, points, cta_text
 
 def get_scalable_font(size: int, bold: bool = False):
     candidates = [
@@ -558,7 +567,8 @@ def get_scalable_font(size: int, bold: bool = False):
                 pass
     return ImageFont.load_default(size=size)
 
-def render_slide_image(badge: str, title: str, body_lines: list, footer_text: str):
+def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
+    """Slide 1 (Cover): Proporsional, Hook Besar 60px, Sub-Hook Rapi, dan Ruang Nafas Lega."""
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     try:
@@ -567,16 +577,17 @@ def render_slide_image(badge: str, title: str, body_lines: list, footer_text: st
     except Exception:
         bg = Image.new("RGB", (W, H), (15, 23, 42))
 
-    overlay = Image.new("RGBA", (W, H), (10, 15, 26, 195))
+    overlay = Image.new("RGBA", (W, H), (10, 15, 26, 205))
     bg.paste(overlay, (0, 0), overlay)
     draw = ImageDraw.Draw(bg)
 
-    f_badge = get_scalable_font(30, bold=True)
-    f_title = get_scalable_font(52, bold=True)
-    f_body = get_scalable_font(36, bold=False)
+    f_badge = get_scalable_font(28, bold=True)
+    f_title = get_scalable_font(60, bold=True)
+    f_sub = get_scalable_font(32, bold=False)
+    f_swipe = get_scalable_font(26, bold=True)
     f_footer = get_scalable_font(30, bold=True)
 
-    # 1. Badge Kategori
+    # 1. Badge Pill
     badge_label = f"  {badge}  "
     l, t, r, b = draw.textbbox((0, 0), badge_label, font=f_badge)
     bw, bh = r - l, b - t
@@ -585,33 +596,273 @@ def render_slide_image(badge: str, title: str, body_lines: list, footer_text: st
     draw.rounded_rectangle([bx - 24, by - 12, bx + bw + 24, by + bh + 14], radius=24, fill=(13, 148, 136))
     draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
 
-    # 2. Judul / Hook
-    t_lines = textwrap.wrap(title, width=28)
-    ty = by + bh + 80
+    # Pisahkan Hook Utama (Besar) dan Sub-Hook (Kecil) agar proporsional
+    words = raw_hook.split()
+    if "—" in raw_hook:
+        parts = raw_hook.split("—", 1)
+        main_title = parts[0].strip()
+        sub_text = parts.strip()
+    elif "-" in raw_hook and len(words) > 8:
+        parts = raw_hook.split("-", 1)
+        main_title = parts[0].strip()
+        sub_text = parts.strip()
+    elif len(words) > 8:
+        main_title = " ".join(words[:8])
+        sub_text = " ".join(words[8:])
+    else:
+        main_title = raw_hook
+        sub_text = "Geser slide ke kiri untuk membaca penjelasan lengkapnya! ➡️"
+
+    # 2. Main Title (H1: Besar, Tebal, Putih)
+    t_lines = textwrap.wrap(main_title, width=22)
+    ty = by + bh + 85
     for line in t_lines:
         l, t, r, b = draw.textbbox((0, 0), line, font=f_title)
         tw = r - l
         draw.text(((W - tw) // 2, ty), line, font=f_title, fill=(255, 255, 255))
-        ty += 68
+        ty += 76
 
     # 3. Garis Aksen Pembatas
-    ty += 25
+    ty += 24
     draw.line([(W // 2 - 60, ty), (W // 2 + 60, ty)], fill=(13, 148, 136), width=4)
-    ty += 50
+    ty += 40
 
-    # 4. Poin-Poin Materi
-    for item in body_lines:
-        s_lines = textwrap.wrap(item, width=38)
-        for sl in s_lines:
-            l, t, r, b = draw.textbbox((0, 0), sl, font=f_body)
-            sw = r - l
-            draw.text(((W - sw) // 2, ty), sl, font=f_body, fill=(226, 232, 240))
-            ty += 52
-        ty += 24
+    # 4. Sub-Hook (H2: Lembut, Rapi)
+    s_lines = textwrap.wrap(sub_text, width=36)
+    for line in s_lines:
+        l, t, r, b = draw.textbbox((0, 0), line, font=f_sub)
+        sw = r - l
+        draw.text(((W - sw) // 2, ty), line, font=f_sub, fill=(203, 213, 225))
+        ty += 48
 
+    # 5. Tombol Swipe
+    swipe_text = "GESER KE KIRI  ➡️"
+    l, t, r, b = draw.textbbox((0, 0), swipe_text, font=f_swipe)
+    swp_w = r - l
+    swp_x = (W - swp_w) // 2
+    swp_y = H - 210
+    draw.rounded_rectangle([swp_x - 20, swp_y - 10, swp_x + swp_w + 20, swp_y + 36], radius=20, fill=(30, 41, 59))
+    draw.text((swp_x, swp_y), swipe_text, font=f_swipe, fill=(248, 250, 252))
+
+    # 6. Footer Branding
     l, t, r, b = draw.textbbox((0, 0), footer_text, font=f_footer)
     fw = r - l
-    draw.text(((W - fw) // 2, H - 110), footer_text, font=f_footer, fill=(148, 163, 184))
+    draw.text(((W - fw) // 2, H - 90), footer_text, font=f_footer, fill=(148, 163, 184))
+
+    return bg
+
+def render_content_slide(badge: str, header_title: str, points_list: list, footer_text: str):
+    """Slide 2 (Materi): Poin-poin dalam kartu gelap berdesain elegan."""
+    W, H = 1080, 1080
+    bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
+    try:
+        r = requests.get(bg_url, timeout=10)
+        bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
+    except Exception:
+        bg = Image.new("RGB", (W, H), (15, 23, 42))
+
+    overlay = Image.new("RGBA", (W, H), (10, 15, 26, 210))
+    bg.paste(overlay, (0, 0), overlay)
+    draw = ImageDraw.Draw(bg)
+
+    f_badge = get_scalable_font(26, bold=True)
+    f_header = get_scalable_font(44, bold=True)
+    f_point_num = get_scalable_font(34, bold=True)
+    f_point_body = get_scalable_font(30, bold=False)
+    f_footer = get_scalable_font(30, bold=True)
+
+    # 1. Badge Top
+    badge_label = f"  {badge}  "
+    l, t, r, b = draw.textbbox((0, 0), badge_label, font=f_badge)
+    bw, bh = r - l, b - t
+    bx = (W - bw) // 2
+    by = 95
+    draw.rounded_rectangle([bx - 20, by - 8, bx + bw + 20, by + bh + 10], radius=20, fill=(13, 148, 136))
+    draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
+
+    # Header
+    l, t, r, b = draw.textbbox((0, 0), header_title, font=f_header)
+    tw = r - l
+    draw.text(((W - tw) // 2, by + bh + 45), header_title, font=f_header, fill=(255, 255, 255))
+
+    dy = by + bh + 105
+    draw.line([(W // 2 - 40, dy), (W // 2 + 40, dy)], fill=(13, 148, 136), width=3)
+
+    # Poin dalam Card Box
+    start_y = dy + 50
+    for item in points_list:
+        if ":" in item:
+            p_title, p_desc = item.split(":", 1)
+        else:
+            p_title, p_desc = item, ""
+
+        box_x1, box_x2 = 100, W - 100
+        box_y1 = start_y
+        
+        title_lines = textwrap.wrap(p_title.strip(), width=32)
+        desc_lines = textwrap.wrap(p_desc.strip(), width=36) if p_desc else []
+        box_h = 40 + len(title_lines) * 44 + len(desc_lines) * 38 + 20
+        box_y2 = box_y1 + box_h
+
+        draw.rounded_rectangle([box_x1, box_y1, box_x2, box_y2], radius=16, fill=(22, 30, 46), outline=(51, 65, 85), width=1)
+        curr_y = box_y1 + 22
+        for tl in title_lines:
+            draw.text((box_x1 + 32, curr_y), tl, font=f_point_num, fill=(52, 211, 153))
+            curr_y += 42
+        curr_y += 6
+        for dl in desc_lines:
+            draw.text((box_x1 + 32, curr_y), dl, font=f_point_body, fill=(203, 213, 225))
+            curr_y += 38
+
+        start_y = box_y2 + 25
+
+    # Footer
+    l, t, r, b = draw.textbbox((0, 0), footer_text, font=f_footer)
+    fw = r - l
+    draw.text(((W - fw) // 2, H - 90), footer_text, font=f_footer, fill=(148, 163, 184))
+
+    return bg
+
+def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text: str):
+    """Slide 3 (Aksi & CTA): Poin terakhir + Kotak Khusus Call to Action."""
+    W, H = 1080, 1080
+    bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
+    try:
+        r = requests.get(bg_url, timeout=10)
+        bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
+    except Exception:
+        bg = Image.new("RGB", (W, H), (15, 23, 42))
+
+    overlay = Image.new("RGBA", (W, H), (10, 15, 26, 210))
+    bg.paste(overlay, (0, 0), overlay)
+    draw = ImageDraw.Draw(bg)
+
+    f_badge = get_scalable_font(26, bold=True)
+    f_header = get_scalable_font(44, bold=True)
+    f_point_num = get_scalable_font(34, bold=True)
+    f_point_body = get_scalable_font(30, bold=False)
+    f_cta_title = get_scalable_font(30, bold=True)
+    f_cta_body = get_scalable_font(32, bold=False)
+    f_footer = get_scalable_font(30, bold=True)
+
+    # 1. Badge Top
+    badge_label = f"  {badge}  "
+    l, t, r, b = draw.textbbox((0, 0), badge_label, font=f_badge)
+    bw, bh = r - l, b - t
+    bx = (W - bw) // 2
+    by = 95
+    draw.rounded_rectangle([bx - 20, by - 8, bx + bw + 20, by + bh + 10], radius=20, fill=(13, 148, 136))
+    draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
+
+    # Header
+    header_title = "Langkah Terakhir & Aksi"
+    l, t, r, b = draw.textbbox((0, 0), header_title, font=f_header)
+    tw = r - l
+    draw.text(((W - tw) // 2, by + bh + 45), header_title, font=f_header, fill=(255, 255, 255))
+
+    dy = by + bh + 105
+    draw.line([(W // 2 - 40, dy), (W // 2 + 40, dy)], fill=(13, 148, 136), width=3)
+
+    # Point 3 Card
+    if ":" in point_text:
+        p_title, p_desc = point_text.split(":", 1)
+    else:
+        p_title, p_desc = point_text, ""
+
+    box_x1, box_x2 = 100, W - 100
+    box_y1 = dy + 45
+    title_lines = textwrap.wrap(p_title.strip(), width=32)
+    desc_lines = textwrap.wrap(p_desc.strip(), width=36) if p_desc else []
+    box_h = 40 + len(title_lines) * 44 + len(desc_lines) * 38 + 20
+    box_y2 = box_y1 + box_h
+
+    draw.rounded_rectangle([box_x1, box_y1, box_x2, box_y2], radius=16, fill=(22, 30, 46), outline=(51, 65, 85), width=1)
+    curr_y = box_y1 + 22
+    for tl in title_lines:
+        draw.text((box_x1 + 32, curr_y), tl, font=f_point_num, fill=(52, 211, 153))
+        curr_y += 42
+    curr_y += 6
+    for dl in desc_lines:
+        draw.text((box_x1 + 32, curr_y), dl, font=f_point_body, fill=(203, 213, 225))
+        curr_y += 38
+
+    # CTA Card Box (Glowing Accent Border)
+    cta_y1 = box_y2 + 40
+    cta_lines = textwrap.wrap(cta_text.strip(), width=34)
+    cta_h = 40 + 36 + len(cta_lines) * 42 + 20
+    cta_y2 = cta_y1 + cta_h
+
+    draw.rounded_rectangle([box_x1, cta_y1, box_x2, cta_y2], radius=16, fill=(16, 32, 28), outline=(16, 185, 129), width=2)
+    cy = cta_y1 + 24
+    draw.text((box_x1 + 32, cy), "💬 BERIKAN PENDAPATMU:", font=f_cta_title, fill=(52, 211, 153))
+    cy += 44
+    for cl in cta_lines:
+        draw.text((box_x1 + 32, cy), cl, font=f_cta_body, fill=(248, 250, 252))
+        cy += 42
+
+    # Footer
+    l, t, r, b = draw.textbbox((0, 0), footer_text, font=f_footer)
+    fw = r - l
+    draw.text(((W - fw) // 2, H - 90), footer_text, font=f_footer, fill=(148, 163, 184))
+
+    return bg
+
+def render_single_image(badge: str, hook: str, points: list, footer_text: str):
+    """Render 1 foto tunggal dengan tata letak proporsional dan tidak bertumpuk."""
+    W, H = 1080, 1080
+    bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
+    try:
+        r = requests.get(bg_url, timeout=10)
+        bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
+    except Exception:
+        bg = Image.new("RGB", (W, H), (15, 23, 42))
+
+    overlay = Image.new("RGBA", (W, H), (10, 15, 26, 205))
+    bg.paste(overlay, (0, 0), overlay)
+    draw = ImageDraw.Draw(bg)
+
+    f_badge = get_scalable_font(28, bold=True)
+    f_title = get_scalable_font(52, bold=True)
+    f_body = get_scalable_font(32, bold=False)
+    f_footer = get_scalable_font(30, bold=True)
+
+    # 1. Badge
+    badge_label = f"  {badge}  "
+    l, t, r, b = draw.textbbox((0, 0), badge_label, font=f_badge)
+    bw, bh = r - l, b - t
+    bx = (W - bw) // 2
+    by = 100
+    draw.rounded_rectangle([bx - 20, by - 8, bx + bw + 20, by + bh + 10], radius=20, fill=(13, 148, 136))
+    draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
+
+    # 2. Hook Title
+    t_lines = textwrap.wrap(hook, width=28)
+    ty = by + bh + 60
+    for line in t_lines:
+        l, t, r, b = draw.textbbox((0, 0), line, font=f_title)
+        tw = r - l
+        draw.text(((W - tw) // 2, ty), line, font=f_title, fill=(255, 255, 255))
+        ty += 64
+
+    # Divider
+    ty += 20
+    draw.line([(W // 2 - 50, ty), (W // 2 + 50, ty)], fill=(13, 148, 136), width=3)
+    ty += 40
+
+    # 3. Points Card
+    for item in points[:3]:
+        p_lines = textwrap.wrap(item, width=38)
+        for pl in p_lines:
+            l, t, r, b = draw.textbbox((0, 0), pl, font=f_body)
+            pw = r - l
+            draw.text(((W - pw) // 2, ty), pl, font=f_body, fill=(226, 232, 240))
+            ty += 46
+        ty += 18
+
+    # 4. Footer
+    l, t, r, b = draw.textbbox((0, 0), footer_text, font=f_footer)
+    fw = r - l
+    draw.text(((W - fw) // 2, H - 90), footer_text, font=f_footer, fill=(148, 163, 184))
 
     return bg
 
@@ -826,39 +1077,44 @@ with tab_studio:
             caption = generate_caption_ai(topic_input)
             if caption:
                 st.session_state["generated_caption"] = caption
-                badge, hook, points = parse_content(caption)
+                badge, hook, points, cta_text = parse_content(caption)
                 if "CAROUSEL" in media_type:
-                    s1 = render_slide_image(badge, hook, ["Geser ke kiri untuk baca selengkapnya ➡️"], branding_handle)
-                    s2 = render_slide_image(badge, "Pembahasan Materi (Bagian 1)", points[:2], branding_handle)
-                    s3 = render_slide_image(badge, "Langkah Tindakan (Aksi Nyata)", points[2:] + ["Ketik 'SETUJU' di komentar jika konten ini bermanfaat!"], branding_handle)
+                    s1 = render_cover_slide(badge, hook, branding_handle)
+                    s2 = render_content_slide(badge, "Pondasi Utama yang Wajib Dibangun", points[:2], branding_handle)
+                    s3 = render_closing_slide(badge, points if len(points) > 2 else points[0], cta_text, branding_handle)
                     st.session_state["rendered_slides"] = [s1, s2, s3]
                 elif "IMAGE" in media_type:
-                    s = render_slide_image(badge, hook, points, branding_handle)
+                    s = render_single_image(badge, hook, points, branding_handle)
                     st.session_state["rendered_slides"] = [s]
                 else:
                     st.session_state["rendered_slides"] = []
 
-    # AREA PRATINJAU DENGAN UKURAN PROPORSIONAL & ALUR REVISI
+    # PRATINJAU DENGAN TATA LETAK MOCKUP PROPORSIONAL & FITUR REVISI
     if "generated_caption" in st.session_state:
         st.markdown("---")
         st.markdown("""
-        <div style="font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 12px;">Pratinjau Hasil Desain (Ukuran Smartphone Mockup)</div>
+        <div style="font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 12px;">Pratinjau Hasil Desain (Smartphone Mockup)</div>
         """, unsafe_allow_html=True)
         
-        # Tampilkan mockup slide dengan lebar proporsional (tidak raksasa)
+        # Tampilkan mockup slide dengan ukuran proporsional (lebar ~320px)
         if "rendered_slides" in st.session_state and st.session_state["rendered_slides"]:
-            cols = st.columns(len(st.session_state["rendered_slides"]))
-            for idx, (col, slide_img) in enumerate(zip(cols, st.session_state["rendered_slides"]), 1):
-                with col:
-                    st.markdown(f"<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 6px;'>SLIDE {idx}</div>", unsafe_allow_html=True)
-                    # Ukuran terkontrol 340px agar pas berdampingan
-                    st.image(slide_img, width=340)
+            if len(st.session_state["rendered_slides"]) > 1:
+                cols = st.columns(len(st.session_state["rendered_slides"]))
+                for idx, (col, slide_img) in enumerate(zip(cols, st.session_state["rendered_slides"]), 1):
+                    with col:
+                        st.markdown(f"<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 8px;'>SLIDE {idx}</div>", unsafe_allow_html=True)
+                        st.image(slide_img, width=320)
+            else:
+                _, col_center, _ = st.columns()
+                with col_center:
+                    st.markdown("<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 8px;'>PREVIEW POSTINGAN</div>", unsafe_allow_html=True)
+                    st.image(st.session_state["rendered_slides"][0], width=380)
 
-        # FITUR REVISI & EDIT NASKAH
+        # FITUR REVISI & SUNTONGAN LANGSUNG
         st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("🛠️ Area Revisi & Penyempurnaan Naskah", expanded=True):
+        with st.expander("🛠️ Area Revisi & Penyempurnaan Desain / Naskah", expanded=True):
             caption_edited = st.text_area(
-                "Naskah Caption (Anda bisa mengedit langsung teks di bawah ini):", 
+                "Naskah Caption (Bebas Anda edit kata-katanya di bawah ini):", 
                 value=st.session_state["generated_caption"], 
                 height=180
             )
@@ -866,42 +1122,42 @@ with tab_studio:
             col_rev1, col_rev2 = st.columns(2)
             with col_rev1:
                 if st.button("🎨 Render Ulang Gambar Sesuai Editan Naskah", type="secondary"):
-                    with st.spinner("Memperbarui kartu gambar visual sesuai editan naskah Anda..."):
-                        badge, hook, points = parse_content(caption_edited)
+                    with st.spinner("Menggambar ulang kartu visual dengan teks hasil editan Anda..."):
+                        badge, hook, points, cta_text = parse_content(caption_edited)
                         if "CAROUSEL" in media_type:
-                            s1 = render_slide_image(badge, hook, ["Geser ke kiri untuk baca selengkapnya ➡️"], branding_handle)
-                            s2 = render_slide_image(badge, "Pembahasan Materi (Bagian 1)", points[:2], branding_handle)
-                            s3 = render_slide_image(badge, "Langkah Tindakan (Aksi Nyata)", points[2:] + ["Ketik 'SETUJU' di komentar jika konten ini bermanfaat!"], branding_handle)
+                            s1 = render_cover_slide(badge, hook, branding_handle)
+                            s2 = render_content_slide(badge, "Pondasi Utama yang Wajib Dibangun", points[:2], branding_handle)
+                            s3 = render_closing_slide(badge, points if len(points) > 2 else points[0], cta_text, branding_handle)
                             st.session_state["rendered_slides"] = [s1, s2, s3]
                         elif "IMAGE" in media_type:
-                            s = render_slide_image(badge, hook, points, branding_handle)
+                            s = render_single_image(badge, hook, points, branding_handle)
                             st.session_state["rendered_slides"] = [s]
                         st.session_state["generated_caption"] = caption_edited
-                        st.success("✅ Gambar visual berhasil diperbarui sesuai naskah editan!")
+                        st.success("✅ Kartu visual berhasil diperbarui sesuai teks editan Anda!")
                         st.rerun()
 
             with col_rev2:
-                revision_note = st.text_input("Catatan revisi untuk AI (opsional)", placeholder="Contoh: Buat hook lebih tajam & singkat")
+                revision_note = st.text_input("Catatan Revisi Khusus untuk AI", placeholder="Contoh: Buat judul lebih pendek dan menusuk")
                 if st.button("🔄 Minta AI Buat Ulang (Revisi Otomatis)", type="secondary"):
                     with st.spinner("Gemini AI sedang menulis ulang materi sesuai catatan revisi..."):
                         new_cap = generate_caption_ai(topic_input, revision_note)
                         if new_cap:
                             st.session_state["generated_caption"] = new_cap
-                            badge, hook, points = parse_content(new_cap)
+                            badge, hook, points, cta_text = parse_content(new_cap)
                             if "CAROUSEL" in media_type:
-                                s1 = render_slide_image(badge, hook, ["Geser ke kiri untuk baca selengkapnya ➡️"], branding_handle)
-                                s2 = render_slide_image(badge, "Pembahasan Materi (Bagian 1)", points[:2], branding_handle)
-                                s3 = render_slide_image(badge, "Langkah Tindakan (Aksi Nyata)", points[2:] + ["Ketik 'SETUJU' di komentar jika konten ini bermanfaat!"], branding_handle)
+                                s1 = render_cover_slide(badge, hook, branding_handle)
+                                s2 = render_content_slide(badge, "Pondasi Utama yang Wajib Dibangun", points[:2], branding_handle)
+                                s3 = render_closing_slide(badge, points if len(points) > 2 else points[0], cta_text, branding_handle)
                                 st.session_state["rendered_slides"] = [s1, s2, s3]
                             elif "IMAGE" in media_type:
-                                s = render_slide_image(badge, hook, points, branding_handle)
+                                s = render_single_image(badge, hook, points, branding_handle)
                                 st.session_state["rendered_slides"] = [s]
                             st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
-        # Tombol Final Simpan
+        # Tombol Simpan
         if st.button("💾 Simpan ke Antrean Terjadwal (posts.json)", type="primary"):
-            with st.spinner("Mengunggah aset visual final ke cloud dan memperbarui antrean..."):
+            with st.spinner("Mengunggah aset visual ke cloud dan memperbarui antrean..."):
                 posts = load_posts()
                 new_id = f"post-{len(posts) + 1:03d}"
                 new_entry = {
@@ -918,7 +1174,7 @@ with tab_studio:
                     new_entry["video_url"] = custom_media if custom_media else "[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)"
                 posts.append(new_entry)
                 save_posts(posts)
-                st.success(f"🎉 Sukses! Draf final `{new_id}` berhasil dimasukkan ke antrean posts.json bertanda PENDING!")
+                st.success(f"🎉 Sukses! Draf `{new_id}` berhasil dimasukkan ke antrean posts.json bertanda PENDING!")
 
 # ==================== TAB 3: ANTREAN & KALENDER ====================
 with tab_queue:
