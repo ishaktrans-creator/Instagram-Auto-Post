@@ -538,12 +538,14 @@ def parse_content(caption: str):
     for line in lines:
         if line.startswith("[") and "]" in line:
             badge = line[1:line.find("]")].strip().upper()
-        elif (not hook or hook == "Tips Edukasi Penting Hari Ini") and not line.startswith("[") and not line.startswith("#"):
+        elif (not hook or hook == "Tips Edukasi Penting Hari Ini") and not line.startswith("[") and not line.startswith("#") and not re.match(r"^\d+[\.\)]", line):
             hook = line
-        elif len(line) > 2 and line[0].isdigit() and (line == "." or line == ")"):
-            points.append(line)
+        elif re.match(r"^\d+[\.\)]", line):
+            # Bersihkan tanda bintang markdown dari teks poin
+            clean_point = re.sub(r"\*+", "", line).strip()
+            points.append(clean_point)
         elif line.lower().startswith("ketik") or "komentar" in line.lower():
-            cta_text = line
+            cta_text = re.sub(r"\*+", "", line).strip()
 
     if not points:
         points = [
@@ -567,7 +569,47 @@ def get_scalable_font(size: int, bold: bool = False):
                 pass
     return ImageFont.load_default(size=size)
 
+def split_hook_intelligently(text: str):
+    """Memisahkan hook menjadi Judul Utama (H1) dan Sub-Judul (H2) secara utuh tanpa memotong kata."""
+    text = re.sub(r"\*+", "", text).strip()
+    
+    # Prioritas 1: Jika ada tanda tanya (?), kalimat tanya adalah headline utama
+    if "?" in text:
+        idx = text.find("?")
+        main_title = text[:idx + 1].strip()
+        sub_text = text[idx + 1:].strip()
+        if not sub_text:
+            sub_text = "Geser slide ke kiri untuk melihat pembahasannya! ➡️"
+        return main_title, sub_text
+
+    # Prioritas 2: Jika ada titik dua (:)
+    if ":" in text:
+        parts = text.split(":", 1)
+        return parts[0].strip(), parts.strip()
+
+    # Prioritas 3: Jika ada em-dash (— atau ' -- ')
+    if "—" in text:
+        parts = text.split("—", 1)
+        return parts[0].strip(), parts.strip()
+    if " -- " in text:
+        parts = text.split(" -- ", 1)
+        return parts[0].strip(), parts.strip()
+
+    # Prioritas 4: Jika ada titik pemisah kalimat (.)
+    if "." in text:
+        parts = text.split(".", 1)
+        if len(parts[0].split()) >= 4:
+            return parts[0].strip() + ".", parts.strip()
+
+    # Prioritas 5: Pembagi kata alami (tidak memotong kata hubung)
+    words = text.split()
+    if len(words) > 8:
+        return " ".join(words[:7]), " ".join(words[7:])
+
+    return text, "Geser slide ke kiri untuk penjelasan lengkapnya! ➡️"
+
 def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
+    """Slide 1 (Cover): Proporsional, Hook Utama Besar & Utuh, Sub-Hook Rapi."""
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     try:
@@ -581,7 +623,7 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     draw = ImageDraw.Draw(bg)
 
     f_badge = get_scalable_font(28, bold=True)
-    f_title = get_scalable_font(60, bold=True)
+    f_title = get_scalable_font(58, bold=True)
     f_sub = get_scalable_font(32, bold=False)
     f_swipe = get_scalable_font(26, bold=True)
     f_footer = get_scalable_font(30, bold=True)
@@ -595,35 +637,17 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     draw.rounded_rectangle([bx - 24, by - 12, bx + bw + 24, by + bh + 14], radius=24, fill=(13, 148, 136))
     draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
 
-    # Pemisahan Kalimat Aman Tanpa Error Indexing
-    words = raw_hook.split()
-    if "—" in raw_hook:
-        main_title, sub_text = raw_hook.split("—", 1)
-        main_title = main_title.strip()
-        sub_text = sub_text.strip()
-    elif "-" in raw_hook and len(words) > 8:
-        main_title, sub_text = raw_hook.split("-", 1)
-        main_title = main_title.strip()
-        sub_text = sub_text.strip()
-    elif ":" in raw_hook:
-        main_title, sub_text = raw_hook.split(":", 1)
-        main_title = main_title.strip()
-        sub_text = sub_text.strip()
-    elif len(words) > 8:
-        main_title = " ".join(words[:7])
-        sub_text = " ".join(words[7:])
-    else:
-        main_title = raw_hook
-        sub_text = "Geser slide ke kiri untuk membaca penjelasan lengkapnya! ➡️"
+    # Pemisahan Judul Cerdas
+    main_title, sub_text = split_hook_intelligently(raw_hook)
 
-    # 2. Main Title (H1: Besar, Tebal, Putih)
-    t_lines = textwrap.wrap(main_title, width=22)
+    # 2. Main Title (H1: Besar, Tebal, Putih, Utuh)
+    t_lines = textwrap.wrap(main_title, width=24)
     ty = by + bh + 85
     for line in t_lines:
         l, t, r, b = draw.textbbox((0, 0), line, font=f_title)
         tw = r - l
         draw.text(((W - tw) // 2, ty), line, font=f_title, fill=(255, 255, 255))
-        ty += 76
+        ty += 74
 
     # 3. Garis Aksen Pembatas
     ty += 24
@@ -631,7 +655,7 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     ty += 40
 
     # 4. Sub-Hook (H2: Lembut, Rapi)
-    s_lines = textwrap.wrap(sub_text, width=36)
+    s_lines = textwrap.wrap(sub_text, width=38)
     for line in s_lines:
         l, t, r, b = draw.textbbox((0, 0), line, font=f_sub)
         sw = r - l
@@ -655,6 +679,7 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     return bg
 
 def render_content_slide(badge: str, header_title: str, points_list: list, footer_text: str):
+    """Slide 2 (Materi): Poin-poin dalam kartu gelap berdesain elegan."""
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     try:
@@ -693,10 +718,11 @@ def render_content_slide(badge: str, header_title: str, points_list: list, foote
     # Poin dalam Card Box
     start_y = dy + 50
     for item in points_list:
-        if ":" in item:
-            p_title, p_desc = item.split(":", 1)
+        clean_item = re.sub(r"\*+", "", item).strip()
+        if ":" in clean_item:
+            p_title, p_desc = clean_item.split(":", 1)
         else:
-            p_title, p_desc = item, ""
+            p_title, p_desc = clean_item, ""
 
         box_x1, box_x2 = 100, W - 100
         box_y1 = start_y
@@ -726,6 +752,7 @@ def render_content_slide(badge: str, header_title: str, points_list: list, foote
     return bg
 
 def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text: str):
+    """Slide 3 (Aksi & CTA): Poin terakhir + Kotak Khusus Call to Action."""
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     try:
@@ -765,10 +792,11 @@ def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text
     draw.line([(W // 2 - 40, dy), (W // 2 + 40, dy)], fill=(13, 148, 136), width=3)
 
     # Point 3 Card
-    if ":" in point_text:
-        p_title, p_desc = point_text.split(":", 1)
+    clean_p3 = re.sub(r"\*+", "", point_text).strip()
+    if ":" in clean_p3:
+        p_title, p_desc = clean_p3.split(":", 1)
     else:
-        p_title, p_desc = point_text, ""
+        p_title, p_desc = clean_p3, ""
 
     box_x1, box_x2 = 100, W - 100
     box_y1 = dy + 45
@@ -789,7 +817,8 @@ def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text
 
     # CTA Card Box
     cta_y1 = box_y2 + 40
-    cta_lines = textwrap.wrap(cta_text.strip(), width=34)
+    clean_cta = re.sub(r"\*+", "", cta_text).strip()
+    cta_lines = textwrap.wrap(clean_cta, width=34)
     cta_h = 40 + 36 + len(cta_lines) * 42 + 20
     cta_y2 = cta_y1 + cta_h
 
@@ -835,7 +864,8 @@ def render_reels_cover_slide(badge: str, raw_hook: str, footer_text: str):
     draw.rounded_rectangle([bx - 28, by - 14, bx + bw + 28, by + bh + 16], radius=28, fill=(13, 148, 136))
     draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
 
-    t_lines = textwrap.wrap(raw_hook, width=22)
+    clean_hook = re.sub(r"\*+", "", raw_hook).strip()
+    t_lines = textwrap.wrap(clean_hook, width=22)
     ty = by + bh + 90
     for line in t_lines:
         l, t, r, b = draw.textbbox((0, 0), line, font=f_title)
@@ -884,7 +914,8 @@ def render_single_image(badge: str, hook: str, points: list, footer_text: str):
     draw.rounded_rectangle([bx - 20, by - 8, bx + bw + 20, by + bh + 10], radius=20, fill=(13, 148, 136))
     draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
 
-    t_lines = textwrap.wrap(hook, width=28)
+    clean_hook = re.sub(r"\*+", "", hook).strip()
+    t_lines = textwrap.wrap(clean_hook, width=28)
     ty = by + bh + 60
     for line in t_lines:
         l, t, r, b = draw.textbbox((0, 0), line, font=f_title)
@@ -897,7 +928,8 @@ def render_single_image(badge: str, hook: str, points: list, footer_text: str):
     ty += 40
 
     for item in points[:3]:
-        p_lines = textwrap.wrap(item, width=38)
+        clean_item = re.sub(r"\*+", "", item).strip()
+        p_lines = textwrap.wrap(clean_item, width=38)
         for pl in p_lines:
             l, t, r, b = draw.textbbox((0, 0), pl, font=f_body)
             pw = r - l
@@ -1134,7 +1166,6 @@ with tab_studio:
         default_idx = fmt_options.index(initial_fmt) if initial_fmt in fmt_options else 0
         media_type = st.selectbox("Format Konten Media", fmt_options, index=default_idx)
         
-        # Pengaturan khusus jika memilih REELS
         if "REELS" in media_type:
             video_src_mode = st.radio("Sumber Video Reels:", ["Tautan URL MP4", "Unggah File Video"], horizontal=True)
             if video_src_mode == "Tautan URL MP4":
@@ -1164,7 +1195,6 @@ with tab_studio:
                 elif "REELS" in media_type:
                     rc = render_reels_cover_slide(badge, hook, branding_handle)
                     st.session_state["rendered_slides"] = [rc]
-                    # Simpan data video untuk diputar di player
                     if uploaded_video_file is not None:
                         st.session_state["reels_play_src"] = uploaded_video_file
                         st.session_state["reels_is_uploaded"] = True
@@ -1182,9 +1212,8 @@ with tab_studio:
         <div style="font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 12px;">Pratinjau Hasil Desain & Media Player</div>
         """, unsafe_allow_html=True)
         
-        # Mode 1: Jika REELS, tampilkan Video Player yang bisa di-play!
         if "REELS" in media_type:
-            col_l, col_c, col_r = st.columns()
+            col_l, col_c, col_r = st.columns(3)
             with col_c:
                 st.markdown("<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 8px;'>🎬 PEMUTAR VIDEO REELS (9:16)</div>", unsafe_allow_html=True)
                 video_play_target = st.session_state.get("reels_play_src", "[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)")
@@ -1194,7 +1223,6 @@ with tab_studio:
                     with st.expander("🖼️ Klik untuk Melihat Desain Cover / Thumbnail Reels"):
                         st.image(st.session_state["rendered_slides"][0], width=260)
         
-        # Mode 2: Jika Karosel atau Foto Tunggal
         elif "rendered_slides" in st.session_state and st.session_state["rendered_slides"]:
             if len(st.session_state["rendered_slides"]) > 1:
                 cols = st.columns(len(st.session_state["rendered_slides"]))
