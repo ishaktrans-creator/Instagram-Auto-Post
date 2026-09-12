@@ -596,20 +596,20 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     draw.rounded_rectangle([bx - 24, by - 12, bx + bw + 24, by + bh + 14], radius=24, fill=(13, 148, 136))
     draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
 
-    # Pemisahan Kalimat Aman Tanpa Error Indexing
+    # Pemisahan Kalimat Aman
     words = raw_hook.split()
     if "—" in raw_hook:
-        main_title, sub_text = raw_hook.split("—", 1)
-        main_title = main_title.strip()
-        sub_text = sub_text.strip()
+        parts = raw_hook.split("—", 1)
+        main_title = parts[0].strip()
+        sub_text = parts.strip()
     elif "-" in raw_hook and len(words) > 8:
-        main_title, sub_text = raw_hook.split("-", 1)
-        main_title = main_title.strip()
-        sub_text = sub_text.strip()
+        parts = raw_hook.split("-", 1)
+        main_title = parts[0].strip()
+        sub_text = parts.strip()
     elif ":" in raw_hook:
-        main_title, sub_text = raw_hook.split(":", 1)
-        main_title = main_title.strip()
-        sub_text = sub_text.strip()
+        parts = raw_hook.split(":", 1)
+        main_title = parts[0].strip()
+        sub_text = parts.strip()
     elif len(words) > 8:
         main_title = " ".join(words[:7])
         sub_text = " ".join(words[7:])
@@ -811,8 +811,58 @@ def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text
 
     return bg
 
+def render_reels_cover_slide(badge: str, raw_hook: str, footer_text: str):
+    """Cover / Thumbnail Khusus Reels Vertikal (9:16)."""
+    W, H = 1080, 1920
+    bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
+    try:
+        r = requests.get(bg_url, timeout=10)
+        bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
+    except Exception:
+        bg = Image.new("RGB", (W, H), (15, 23, 42))
+
+    overlay = Image.new("RGBA", (W, H), (10, 15, 26, 215))
+    bg.paste(overlay, (0, 0), overlay)
+    draw = ImageDraw.Draw(bg)
+
+    f_badge = get_scalable_font(32, bold=True)
+    f_title = get_scalable_font(68, bold=True)
+    f_sub = get_scalable_font(36, bold=False)
+    f_footer = get_scalable_font(32, bold=True)
+
+    badge_label = f"  {badge}  "
+    l, t, r, b = draw.textbbox((0, 0), badge_label, font=f_badge)
+    bw, bh = r - l, b - t
+    bx = (W - bw) // 2
+    by = 450
+    draw.rounded_rectangle([bx - 28, by - 14, bx + bw + 28, by + bh + 16], radius=28, fill=(13, 148, 136))
+    draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
+
+    t_lines = textwrap.wrap(raw_hook, width=22)
+    ty = by + bh + 90
+    for line in t_lines:
+        l, t, r, b = draw.textbbox((0, 0), line, font=f_title)
+        tw = r - l
+        draw.text(((W - tw) // 2, ty), line, font=f_title, fill=(255, 255, 255))
+        ty += 84
+
+    ty += 30
+    draw.line([(W // 2 - 80, ty), (W // 2 + 80, ty)], fill=(13, 148, 136), width=5)
+    ty += 50
+
+    watch_text = "🎬 TONTON VIDEO REELS LENGKAP"
+    l, t, r, b = draw.textbbox((0, 0), watch_text, font=f_sub)
+    sw = r - l
+    draw.text(((W - sw) // 2, ty), watch_text, font=f_sub, fill=(203, 213, 225))
+
+    l, t, r, b = draw.textbbox((0, 0), footer_text, font=f_footer)
+    fw = r - l
+    draw.text(((W - fw) // 2, H - 200), footer_text, font=f_footer, fill=(148, 163, 184))
+
+    return bg
+
 def render_single_image(badge: str, hook: str, points: list, footer_text: str):
-    """Render 1 foto tunggal dengan tata letak proporsional dan tidak bertumpuk."""
+    """Render 1 foto tunggal feed proporsional."""
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     try:
@@ -830,7 +880,6 @@ def render_single_image(badge: str, hook: str, points: list, footer_text: str):
     f_body = get_scalable_font(32, bold=False)
     f_footer = get_scalable_font(30, bold=True)
 
-    # 1. Badge
     badge_label = f"  {badge}  "
     l, t, r, b = draw.textbbox((0, 0), badge_label, font=f_badge)
     bw, bh = r - l, b - t
@@ -839,7 +888,6 @@ def render_single_image(badge: str, hook: str, points: list, footer_text: str):
     draw.rounded_rectangle([bx - 20, by - 8, bx + bw + 20, by + bh + 10], radius=20, fill=(13, 148, 136))
     draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
 
-    # 2. Hook Title
     t_lines = textwrap.wrap(hook, width=28)
     ty = by + bh + 60
     for line in t_lines:
@@ -848,12 +896,10 @@ def render_single_image(badge: str, hook: str, points: list, footer_text: str):
         draw.text(((W - tw) // 2, ty), line, font=f_title, fill=(255, 255, 255))
         ty += 64
 
-    # Divider
     ty += 20
     draw.line([(W // 2 - 50, ty), (W // 2 + 50, ty)], fill=(13, 148, 136), width=3)
     ty += 40
 
-    # 3. Points Card
     for item in points[:3]:
         p_lines = textwrap.wrap(item, width=38)
         for pl in p_lines:
@@ -863,7 +909,6 @@ def render_single_image(badge: str, hook: str, points: list, footer_text: str):
             ty += 46
         ty += 18
 
-    # 4. Footer
     l, t, r, b = draw.textbbox((0, 0), footer_text, font=f_footer)
     fw = r - l
     draw.text(((W - fw) // 2, H - 90), footer_text, font=f_footer, fill=(148, 163, 184))
@@ -1090,10 +1135,12 @@ with tab_studio:
                 elif "IMAGE" in media_type:
                     s = render_single_image(badge, hook, points, branding_handle)
                     st.session_state["rendered_slides"] = [s]
-                else:
-                    st.session_state["rendered_slides"] = []
+                elif "REELS" in media_type:
+                    # Render Cover/Thumbnail Vertikal (9:16) khusus untuk Reels
+                    rc = render_reels_cover_slide(badge, hook, branding_handle)
+                    st.session_state["rendered_slides"] = [rc]
 
-    # PRATINJAU PROPORSIONAL DENGAN MOCKUP SMARTPHONE & FITUR REVISI
+    # PRATINJAU DENGAN TATA LETAK MOCKUP PROPORSIONAL & FITUR REVISI
     if "generated_caption" in st.session_state:
         st.markdown("---")
         st.markdown("""
@@ -1108,10 +1155,11 @@ with tab_studio:
                         st.markdown(f"<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 8px;'>SLIDE {idx}</div>", unsafe_allow_html=True)
                         st.image(slide_img, width=320)
             else:
-                col_left, col_center, col_right = st.columns()
+                col_left, col_center, col_right = st.columns(3)
                 with col_center:
-                    st.markdown("<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 8px;'>PREVIEW POSTINGAN</div>", unsafe_allow_html=True)
-                    st.image(st.session_state["rendered_slides"][0], width=380)
+                    label = "COVER / THUMBNAIL REELS (9:16)" if "REELS" in media_type else "PREVIEW POSTINGAN"
+                    st.markdown(f"<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 8px;'>{label}</div>", unsafe_allow_html=True)
+                    st.image(st.session_state["rendered_slides"][0], width=320 if "REELS" in media_type else 380)
 
         # FITUR REVISI & SUNTINGAN LANGSUNG
         st.markdown("<br>", unsafe_allow_html=True)
@@ -1135,6 +1183,10 @@ with tab_studio:
                         elif "IMAGE" in media_type:
                             s = render_single_image(badge, hook, points, branding_handle)
                             st.session_state["rendered_slides"] = [s]
+                        elif "REELS" in media_type:
+                            rc = render_reels_cover_slide(badge, hook, branding_handle)
+                            st.session_state["rendered_slides"] = [rc]
+                            
                         st.session_state["generated_caption"] = caption_edited
                         st.success("✅ Kartu visual berhasil diperbarui sesuai teks editan Anda!")
                         st.rerun()
@@ -1155,6 +1207,9 @@ with tab_studio:
                             elif "IMAGE" in media_type:
                                 s = render_single_image(badge, hook, points, branding_handle)
                                 st.session_state["rendered_slides"] = [s]
+                            elif "REELS" in media_type:
+                                rc = render_reels_cover_slide(badge, hook, branding_handle)
+                                st.session_state["rendered_slides"] = [rc]
                             st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
