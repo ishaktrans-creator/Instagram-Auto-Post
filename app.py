@@ -568,7 +568,6 @@ def get_scalable_font(size: int, bold: bool = False):
     return ImageFont.load_default(size=size)
 
 def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
-    """Slide 1 (Cover): Proporsional, Hook Besar 60px, Sub-Hook Rapi, dan Ruang Nafas Lega."""
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     try:
@@ -596,20 +595,20 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     draw.rounded_rectangle([bx - 24, by - 12, bx + bw + 24, by + bh + 14], radius=24, fill=(13, 148, 136))
     draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
 
-    # Pemisahan Kalimat Aman
+    # Pemisahan Kalimat Aman Tanpa Error Indexing
     words = raw_hook.split()
     if "—" in raw_hook:
-        parts = raw_hook.split("—", 1)
-        main_title = parts[0].strip()
-        sub_text = parts.strip()
+        main_title, sub_text = raw_hook.split("—", 1)
+        main_title = main_title.strip()
+        sub_text = sub_text.strip()
     elif "-" in raw_hook and len(words) > 8:
-        parts = raw_hook.split("-", 1)
-        main_title = parts[0].strip()
-        sub_text = parts.strip()
+        main_title, sub_text = raw_hook.split("-", 1)
+        main_title = main_title.strip()
+        sub_text = sub_text.strip()
     elif ":" in raw_hook:
-        parts = raw_hook.split(":", 1)
-        main_title = parts[0].strip()
-        sub_text = parts.strip()
+        main_title, sub_text = raw_hook.split(":", 1)
+        main_title = main_title.strip()
+        sub_text = sub_text.strip()
     elif len(words) > 8:
         main_title = " ".join(words[:7])
         sub_text = " ".join(words[7:])
@@ -656,7 +655,6 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     return bg
 
 def render_content_slide(badge: str, header_title: str, points_list: list, footer_text: str):
-    """Slide 2 (Materi): Poin-poin dalam kartu gelap berdesain elegan."""
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     try:
@@ -728,7 +726,6 @@ def render_content_slide(badge: str, header_title: str, points_list: list, foote
     return bg
 
 def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text: str):
-    """Slide 3 (Aksi & CTA): Poin terakhir + Kotak Khusus Call to Action."""
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     try:
@@ -862,7 +859,6 @@ def render_reels_cover_slide(badge: str, raw_hook: str, footer_text: str):
     return bg
 
 def render_single_image(badge: str, hook: str, points: list, footer_text: str):
-    """Render 1 foto tunggal feed proporsional."""
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     try:
@@ -933,6 +929,24 @@ def upload_image_cloud(pil_img):
             return r["image"]["url"]
     except Exception:
         pass
+    return ""
+
+def upload_video_cloud(file_obj, filename="video.mp4"):
+    try:
+        url = "[https://litterbox.catbox.moe/resources/internals/api.php](https://litterbox.catbox.moe/resources/internals/api.php)"
+        if hasattr(file_obj, "getvalue"):
+            data_bytes = file_obj.getvalue()
+        elif hasattr(file_obj, "read"):
+            data_bytes = file_obj.read()
+        else:
+            data_bytes = file_obj
+        files = {"fileToUpload": (filename, data_bytes, "video/mp4")}
+        data = {"reqtype": "fileupload", "time": "72h"}
+        res = requests.post(url, data=data, files=files, timeout=60)
+        if res.status_code == 200 and res.text.strip().startswith("http"):
+            return res.text.strip()
+    except Exception as e:
+        print(f"Litterbox video error: {e}")
     return ""
 
 # ==================== SIDEBAR ====================
@@ -1112,14 +1126,26 @@ with tab_studio:
         topic_input = st.text_area(
             "Topik Konten atau Ide Bisnis",
             value=initial_topic,
-            height=120,
+            height=130,
             help="Topik ini bisa diambil otomatis dari Bank Ide atau diketik sendiri secara bebas."
         )
     with col_config:
         fmt_options = ["CAROUSEL (3 Slide)", "IMAGE (1 Foto)", "REELS (Video)"]
         default_idx = fmt_options.index(initial_fmt) if initial_fmt in fmt_options else 0
         media_type = st.selectbox("Format Konten Media", fmt_options, index=default_idx)
-        custom_media = st.text_input("Link Media Khusus (Opsional)", placeholder="https://...")
+        
+        # Pengaturan khusus jika memilih REELS
+        if "REELS" in media_type:
+            video_src_mode = st.radio("Sumber Video Reels:", ["Tautan URL MP4", "Unggah File Video"], horizontal=True)
+            if video_src_mode == "Tautan URL MP4":
+                custom_media = st.text_input("Tautan Video MP4 Vertikal (9:16)", value="[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)")
+                uploaded_video_file = None
+            else:
+                uploaded_video_file = st.file_uploader("Pilih file video MP4 dari perangkat:", type=["mp4", "mov"])
+                custom_media = ""
+        else:
+            custom_media = st.text_input("Link Media Khusus (Opsional)", placeholder="https://...")
+            uploaded_video_file = None
     
     if st.button("🚀 Buat Materi & Render Desain Visual", type="primary"):
         with st.spinner("Gemini 3.6 Flash sedang menyusun materi & mesin grafis merender kartu visual..."):
@@ -1136,18 +1162,40 @@ with tab_studio:
                     s = render_single_image(badge, hook, points, branding_handle)
                     st.session_state["rendered_slides"] = [s]
                 elif "REELS" in media_type:
-                    # Render Cover/Thumbnail Vertikal (9:16) khusus untuk Reels
                     rc = render_reels_cover_slide(badge, hook, branding_handle)
                     st.session_state["rendered_slides"] = [rc]
+                    # Simpan data video untuk diputar di player
+                    if uploaded_video_file is not None:
+                        st.session_state["reels_play_src"] = uploaded_video_file
+                        st.session_state["reels_is_uploaded"] = True
+                    elif custom_media:
+                        st.session_state["reels_play_src"] = custom_media
+                        st.session_state["reels_is_uploaded"] = False
+                    else:
+                        st.session_state["reels_play_src"] = "[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)"
+                        st.session_state["reels_is_uploaded"] = False
 
-    # PRATINJAU DENGAN TATA LETAK MOCKUP PROPORSIONAL & FITUR REVISI
+    # PRATINJAU INTERAKTIF
     if "generated_caption" in st.session_state:
         st.markdown("---")
         st.markdown("""
-        <div style="font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 12px;">Pratinjau Hasil Desain (Smartphone Mockup)</div>
+        <div style="font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 12px;">Pratinjau Hasil Desain & Media Player</div>
         """, unsafe_allow_html=True)
         
-        if "rendered_slides" in st.session_state and st.session_state["rendered_slides"]:
+        # Mode 1: Jika REELS, tampilkan Video Player yang bisa di-play!
+        if "REELS" in media_type:
+            col_l, col_c, col_r = st.columns()
+            with col_c:
+                st.markdown("<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 8px;'>🎬 PEMUTAR VIDEO REELS (9:16)</div>", unsafe_allow_html=True)
+                video_play_target = st.session_state.get("reels_play_src", "[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)")
+                st.video(video_play_target)
+                
+                if "rendered_slides" in st.session_state and st.session_state["rendered_slides"]:
+                    with st.expander("🖼️ Klik untuk Melihat Desain Cover / Thumbnail Reels"):
+                        st.image(st.session_state["rendered_slides"][0], width=260)
+        
+        # Mode 2: Jika Karosel atau Foto Tunggal
+        elif "rendered_slides" in st.session_state and st.session_state["rendered_slides"]:
             if len(st.session_state["rendered_slides"]) > 1:
                 cols = st.columns(len(st.session_state["rendered_slides"]))
                 for idx, (col, slide_img) in enumerate(zip(cols, st.session_state["rendered_slides"]), 1):
@@ -1157,9 +1205,8 @@ with tab_studio:
             else:
                 col_left, col_center, col_right = st.columns(3)
                 with col_center:
-                    label = "COVER / THUMBNAIL REELS (9:16)" if "REELS" in media_type else "PREVIEW POSTINGAN"
-                    st.markdown(f"<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 8px;'>{label}</div>", unsafe_allow_html=True)
-                    st.image(st.session_state["rendered_slides"][0], width=320 if "REELS" in media_type else 380)
+                    st.markdown("<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 8px;'>PREVIEW POSTINGAN</div>", unsafe_allow_html=True)
+                    st.image(st.session_state["rendered_slides"][0], width=380)
 
         # FITUR REVISI & SUNTINGAN LANGSUNG
         st.markdown("<br>", unsafe_allow_html=True)
@@ -1188,7 +1235,7 @@ with tab_studio:
                             st.session_state["rendered_slides"] = [rc]
                             
                         st.session_state["generated_caption"] = caption_edited
-                        st.success("✅ Kartu visual berhasil diperbarui sesuai teks editan Anda!")
+                        st.success("✅ Gambar visual berhasil diperbarui sesuai teks editan Anda!")
                         st.rerun()
 
             with col_rev2:
@@ -1215,7 +1262,7 @@ with tab_studio:
         st.markdown("<br>", unsafe_allow_html=True)
         # Tombol Simpan
         if st.button("💾 Simpan ke Antrean Terjadwal (posts.json)", type="primary"):
-            with st.spinner("Mengunggah aset visual ke cloud dan memperbarui antrean..."):
+            with st.spinner("Mengunggah aset media ke cloud dan memperbarui antrean..."):
                 posts = load_posts()
                 new_id = f"post-{len(posts) + 1:03d}"
                 new_entry = {
@@ -1229,7 +1276,11 @@ with tab_studio:
                 elif "IMAGE" in media_type:
                     new_entry["image_url"] = upload_image_cloud(st.session_state["rendered_slides"][0])
                 elif "REELS" in media_type:
-                    new_entry["video_url"] = custom_media if custom_media else "[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)"
+                    if st.session_state.get("reels_is_uploaded", False) and uploaded_video_file is not None:
+                        new_entry["video_url"] = upload_video_cloud(uploaded_video_file, uploaded_video_file.name)
+                    else:
+                        new_entry["video_url"] = custom_media if custom_media else "[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)"
+                
                 posts.append(new_entry)
                 save_posts(posts)
                 st.success(f"🎉 Sukses! Draf `{new_id}` berhasil dimasukkan ke antrean posts.json bertanda PENDING!")
