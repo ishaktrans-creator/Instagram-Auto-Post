@@ -541,7 +541,6 @@ def parse_content(caption: str):
         elif (not hook or hook == "Tips Edukasi Penting Hari Ini") and not line.startswith("[") and not line.startswith("#") and not re.match(r"^\d+[\.\)]", line):
             hook = line
         elif re.match(r"^\d+[\.\)]", line):
-            # Bersihkan tanda bintang markdown dari teks poin
             clean_point = re.sub(r"\*+", "", line).strip()
             points.append(clean_point)
         elif line.lower().startswith("ketik") or "komentar" in line.lower():
@@ -570,10 +569,8 @@ def get_scalable_font(size: int, bold: bool = False):
     return ImageFont.load_default(size=size)
 
 def split_hook_intelligently(text: str):
-    """Memisahkan hook menjadi Judul Utama (H1) dan Sub-Judul (H2) secara utuh tanpa memotong kata."""
     text = re.sub(r"\*+", "", text).strip()
     
-    # Prioritas 1: Jika ada tanda tanya (?), kalimat tanya adalah headline utama
     if "?" in text:
         idx = text.find("?")
         main_title = text[:idx + 1].strip()
@@ -582,12 +579,10 @@ def split_hook_intelligently(text: str):
             sub_text = "Geser slide ke kiri untuk melihat pembahasannya! ➡️"
         return main_title, sub_text
 
-    # Prioritas 2: Jika ada titik dua (:)
     if ":" in text:
         parts = text.split(":", 1)
         return parts[0].strip(), parts.strip()
 
-    # Prioritas 3: Jika ada em-dash (— atau ' -- ')
     if "—" in text:
         parts = text.split("—", 1)
         return parts[0].strip(), parts.strip()
@@ -595,13 +590,11 @@ def split_hook_intelligently(text: str):
         parts = text.split(" -- ", 1)
         return parts[0].strip(), parts.strip()
 
-    # Prioritas 4: Jika ada titik pemisah kalimat (.)
     if "." in text:
         parts = text.split(".", 1)
         if len(parts[0].split()) >= 4:
             return parts[0].strip() + ".", parts.strip()
 
-    # Prioritas 5: Pembagi kata alami (tidak memotong kata hubung)
     words = text.split()
     if len(words) > 8:
         return " ".join(words[:7]), " ".join(words[7:])
@@ -609,7 +602,6 @@ def split_hook_intelligently(text: str):
     return text, "Geser slide ke kiri untuk penjelasan lengkapnya! ➡️"
 
 def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
-    """Slide 1 (Cover): Proporsional, Hook Utama Besar & Utuh, Sub-Hook Rapi."""
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     try:
@@ -640,7 +632,7 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     # Pemisahan Judul Cerdas
     main_title, sub_text = split_hook_intelligently(raw_hook)
 
-    # 2. Main Title (H1: Besar, Tebal, Putih, Utuh)
+    # 2. Main Title
     t_lines = textwrap.wrap(main_title, width=24)
     ty = by + bh + 85
     for line in t_lines:
@@ -654,7 +646,7 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     draw.line([(W // 2 - 60, ty), (W // 2 + 60, ty)], fill=(13, 148, 136), width=4)
     ty += 40
 
-    # 4. Sub-Hook (H2: Lembut, Rapi)
+    # 4. Sub-Hook
     s_lines = textwrap.wrap(sub_text, width=38)
     for line in s_lines:
         l, t, r, b = draw.textbbox((0, 0), line, font=f_sub)
@@ -679,7 +671,6 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     return bg
 
 def render_content_slide(badge: str, header_title: str, points_list: list, footer_text: str):
-    """Slide 2 (Materi): Poin-poin dalam kartu gelap berdesain elegan."""
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     try:
@@ -752,7 +743,6 @@ def render_content_slide(badge: str, header_title: str, points_list: list, foote
     return bg
 
 def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text: str):
-    """Slide 3 (Aksi & CTA): Poin terakhir + Kotak Khusus Call to Action."""
     W, H = 1080, 1080
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     try:
@@ -838,7 +828,6 @@ def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text
     return bg
 
 def render_reels_cover_slide(badge: str, raw_hook: str, footer_text: str):
-    """Cover / Thumbnail Khusus Reels Vertikal (9:16)."""
     W, H = 1080, 1920
     bg_url = THEMATIC_BACKGROUNDS.get(badge, THEMATIC_BACKGROUNDS["TIPS BISNIS"])
     try:
@@ -981,6 +970,97 @@ def upload_video_cloud(file_obj, filename="video.mp4"):
         print(f"Litterbox video error: {e}")
     return ""
 
+# ==================== ENGINE PENERBITAN INSTAGRAM LANGSUNG ====================
+def create_instagram_container_direct(post: dict) -> str:
+    if not META_ACCESS_TOKEN or not IG_USER_ID:
+        raise Exception("Kredensial META_ACCESS_TOKEN atau IG_USER_ID belum terpasang.")
+
+    url = f"{GRAPH_API_URL}/{IG_USER_ID}/media"
+    caption = post.get("caption", "")
+
+    # Mode 1: Karosel
+    if "carousel_urls" in post and isinstance(post["carousel_urls"], list) and len(post["carousel_urls"]) > 1:
+        children_ids = []
+        for img_url in post["carousel_urls"]:
+            child_payload = {
+                "image_url": img_url,
+                "is_carousel_item": "true",
+                "access_token": META_ACCESS_TOKEN
+            }
+            c_res = requests.post(url, params=child_payload, timeout=30).json()
+            if "id" not in c_res:
+                raise Exception(f"Gagal upload slide karosel: {c_res}")
+            children_ids.append(c_res["id"])
+            time.sleep(2)
+
+        parent_payload = {
+            "media_type": "CAROUSEL",
+            "children": ",".join(children_ids),
+            "caption": caption,
+            "access_token": META_ACCESS_TOKEN
+        }
+        res = requests.post(url, params=parent_payload, timeout=30).json()
+        if "id" not in res:
+            raise Exception(f"Gagal membuat container karosel: {res}")
+        return res["id"]
+
+    # Mode 2: Video Reels
+    elif "video_url" in post and post["video_url"]:
+        payload = {
+            "media_type": "REELS",
+            "video_url": post["video_url"],
+            "caption": caption,
+            "share_to_feed": "true",
+            "access_token": META_ACCESS_TOKEN
+        }
+        res = requests.post(url, params=payload, timeout=30).json()
+        if "id" not in res:
+            raise Exception(f"Gagal membuat container Reels: {res}")
+        return res["id"]
+
+    # Mode 3: Foto Tunggal
+    else:
+        payload = {
+            "image_url": post.get("image_url", ""),
+            "caption": caption,
+            "access_token": META_ACCESS_TOKEN
+        }
+        res = requests.post(url, params=payload, timeout=30).json()
+        if "id" not in res:
+            raise Exception(f"Gagal membuat container Image: {res}")
+        return res["id"]
+
+def wait_for_media_ready_direct(container_id: str, max_wait_seconds: int = 180):
+    url = f"{GRAPH_API_URL}/{container_id}"
+    params = {"fields": "status_code,status", "access_token": META_ACCESS_TOKEN}
+    start = time.time()
+    while time.time() - start < max_wait_seconds:
+        res = requests.get(url, params=params, timeout=20).json()
+        status = res.get("status_code")
+        if status == "FINISHED":
+            return
+        elif status == "ERROR":
+            raise Exception(f"Meta gagal memproses video: {res}")
+        elif status == "EXPIRED":
+            raise Exception("Container video kedaluwarsa.")
+        time.sleep(8)
+    raise TimeoutError("Waktu tunggu video di Meta melebihi batas waktu.")
+
+def publish_to_instagram_direct(container_id: str) -> str:
+    url = f"{GRAPH_API_URL}/{IG_USER_ID}/media_publish"
+    res = requests.post(url, params={"creation_id": container_id, "access_token": META_ACCESS_TOKEN}, timeout=30).json()
+    if "id" not in res:
+        raise Exception(f"Gagal publish ke Instagram: {res}")
+    return res["id"]
+
+def execute_publish_post(post: dict) -> str:
+    container_id = create_instagram_container_direct(post)
+    if "video_url" in post and post["video_url"]:
+        wait_for_media_ready_direct(container_id)
+    else:
+        time.sleep(3)
+    return publish_to_instagram_direct(container_id)
+
 # ==================== SIDEBAR ====================
 with st.sidebar:
     st.markdown("""
@@ -1039,7 +1119,7 @@ st.markdown("""
     Instagram Content Automation Dashboard
   </h1>
   <p style="font-size: 14px; color: #94A3B8; margin: 8px 0 0 0; line-height: 1.6;">
-    Pusat komando konten: riset ide viral 30 hari lintas niche, copywriting Gemini AI, visual render engine, dan penjadwalan cloud mandiri.
+    Pusat komando konten: riset ide viral 30 hari lintas niche, copywriting Gemini AI, visual render engine, dan penerbitan instan / terjadwal.
   </p>
 </div>
 """, unsafe_allow_html=True)
@@ -1288,35 +1368,71 @@ with tab_studio:
                             st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
-        # Tombol Simpan
-        if st.button("💾 Simpan ke Antrean Terjadwal (posts.json)", type="primary"):
-            with st.spinner("Mengunggah aset media ke cloud dan memperbarui antrean..."):
-                posts = load_posts()
-                new_id = f"post-{len(posts) + 1:03d}"
-                new_entry = {
-                    "id": new_id,
-                    "caption": caption_edited,
-                    "status": "PENDING"
-                }
-                if "CAROUSEL" in media_type:
-                    urls = [upload_image_cloud(img) for img in st.session_state["rendered_slides"]]
-                    new_entry["carousel_urls"] = urls
-                elif "IMAGE" in media_type:
-                    new_entry["image_url"] = upload_image_cloud(st.session_state["rendered_slides"][0])
-                elif "REELS" in media_type:
-                    if st.session_state.get("reels_is_uploaded", False) and uploaded_video_file is not None:
-                        new_entry["video_url"] = upload_video_cloud(uploaded_video_file, uploaded_video_file.name)
-                    else:
-                        new_entry["video_url"] = custom_media if custom_media else "[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)"
-                
-                posts.append(new_entry)
-                save_posts(posts)
-                st.success(f"🎉 Sukses! Draf `{new_id}` berhasil dimasukkan ke antrean posts.json bertanda PENDING!")
+        
+        # Dua Pilihan: Simpan ke Antrean ATAU Terbitkan Langsung Seketika
+        col_act_save, col_act_pub = st.columns(2)
+        with col_act_save:
+            if st.button("💾 Simpan ke Antrean Terjadwal (posts.json)", type="secondary"):
+                with st.spinner("Mengunggah aset media ke cloud dan memperbarui antrean..."):
+                    posts = load_posts()
+                    new_id = f"post-{len(posts) + 1:03d}"
+                    new_entry = {
+                        "id": new_id,
+                        "caption": caption_edited,
+                        "status": "PENDING"
+                    }
+                    if "CAROUSEL" in media_type:
+                        urls = [upload_image_cloud(img) for img in st.session_state["rendered_slides"]]
+                        new_entry["carousel_urls"] = urls
+                    elif "IMAGE" in media_type:
+                        new_entry["image_url"] = upload_image_cloud(st.session_state["rendered_slides"][0])
+                    elif "REELS" in media_type:
+                        if st.session_state.get("reels_is_uploaded", False) and uploaded_video_file is not None:
+                            new_entry["video_url"] = upload_video_cloud(uploaded_video_file, uploaded_video_file.name)
+                        else:
+                            new_entry["video_url"] = custom_media if custom_media else "[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)"
+                    
+                    posts.append(new_entry)
+                    save_posts(posts)
+                    st.success(f"🎉 Sukses! Draf `{new_id}` berhasil dimasukkan ke antrean posts.json bertanda PENDING!")
+
+        with col_act_pub:
+            if st.button("🚀 Simpan & Publish Langsung ke Instagram!", type="primary"):
+                with st.spinner("Mengunggah media dan menerbitkan langsung ke akun Instagram @ishak_radjab..."):
+                    posts = load_posts()
+                    new_id = f"post-{len(posts) + 1:03d}"
+                    new_entry = {
+                        "id": new_id,
+                        "caption": caption_edited,
+                        "status": "PENDING"
+                    }
+                    if "CAROUSEL" in media_type:
+                        urls = [upload_image_cloud(img) for img in st.session_state["rendered_slides"]]
+                        new_entry["carousel_urls"] = urls
+                    elif "IMAGE" in media_type:
+                        new_entry["image_url"] = upload_image_cloud(st.session_state["rendered_slides"][0])
+                    elif "REELS" in media_type:
+                        if st.session_state.get("reels_is_uploaded", False) and uploaded_video_file is not None:
+                            new_entry["video_url"] = upload_video_cloud(uploaded_video_file, uploaded_video_file.name)
+                        else:
+                            new_entry["video_url"] = custom_media if custom_media else "[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)"
+
+                    try:
+                        ig_post_id = execute_publish_post(new_entry)
+                        new_entry["status"] = "PUBLISHED"
+                        new_entry["published_id"] = ig_post_id
+                        new_entry["published_at"] = datetime.now(LOCAL_TZ).isoformat()
+                        posts.append(new_entry)
+                        save_posts(posts)
+                        st.success(f"🎉 Hebat! `{new_id}` berhasil tayang di Instagram! Post ID: `{ig_post_id}`")
+                    except Exception as err:
+                        st.error(f"Gagal menerbitkan: {err}")
 
 # ==================== TAB 3: ANTREAN & KALENDER ====================
 with tab_queue:
     st.markdown("""
     <div style="font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 4px;">Manajemen Antrean & Kalender Jadwal</div>
+    <div style="font-size: 14px; color: #94A3B8; margin-bottom: 20px;">Pantau jadwal konten. Anda dapat mengklik <b>Publish Sekarang</b> pada postingan PENDING untuk langsung menerbitkannya seketika.</div>
     """, unsafe_allow_html=True)
     posts = load_posts()
     
@@ -1337,10 +1453,11 @@ with tab_queue:
     else:
         for p in reversed(posts):
             status = p.get("status", "UNKNOWN")
+            post_id = p.get("id")
             with st.container():
-                c1, c2, c3 = st.columns(3)
+                c1, c2, c3 = st.columns()
                 with c1:
-                    st.write(f"**{p.get('id')}**")
+                    st.write(f"**{post_id}**")
                     if status == "PUBLISHED":
                         st.success("PUBLISHED")
                     elif status == "PENDING":
@@ -1357,8 +1474,25 @@ with tab_queue:
                     else:
                         st.caption("Tipe: Foto Feed Tunggal")
                 with c3:
-                    if status != "PENDING":
-                        if st.button("Set PENDING", key=f"btn_pend_{p.get('id')}"):
+                    # JIKA STATUS PENDING: MUNCULKAN TOMBOL PUBLISH SEKARANG
+                    if status == "PENDING":
+                        if st.button("🚀 Publish Sekarang", key=f"btn_pub_now_{post_id}", type="primary"):
+                            with st.spinner(f"Menerbitkan {post_id} langsung ke Instagram @ishak_radjab..."):
+                                try:
+                                    ig_id = execute_publish_post(p)
+                                    p["status"] = "PUBLISHED"
+                                    p["published_id"] = ig_id
+                                    p["published_at"] = datetime.now(LOCAL_TZ).isoformat()
+                                    if "error_message" in p:
+                                        del p["error_message"]
+                                    save_posts(posts)
+                                    st.success(f"🎉 Sukses! {post_id} terbit di Instagram! ID: `{ig_id}`")
+                                    time.sleep(1.5)
+                                    st.rerun()
+                                except Exception as err:
+                                    st.error(f"Gagal menerbitkan: {err}")
+                    else:
+                        if st.button("Set PENDING", key=f"btn_pend_{post_id}"):
                             p["status"] = "PENDING"
                             save_posts(posts)
                             st.rerun()
