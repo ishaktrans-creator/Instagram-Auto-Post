@@ -621,7 +621,6 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     f_swipe = get_scalable_font(26, bold=True)
     f_footer = get_scalable_font(30, bold=True)
 
-    # 1. Badge Pill
     badge_label = f"  {badge}  "
     l, t, r, b = draw.textbbox((0, 0), badge_label, font=f_badge)
     bw, bh = r - l, b - t
@@ -630,10 +629,8 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     draw.rounded_rectangle([bx - 24, by - 12, bx + bw + 24, by + bh + 14], radius=24, fill=(13, 148, 136))
     draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
 
-    # Pemisahan Judul Cerdas
     main_title, sub_text = split_hook_intelligently(raw_hook)
 
-    # 2. Main Title
     t_lines = textwrap.wrap(main_title, width=24)
     ty = by + bh + 85
     for line in t_lines:
@@ -642,12 +639,10 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
         draw.text(((W - tw) // 2, ty), line, font=f_title, fill=(255, 255, 255))
         ty += 74
 
-    # 3. Garis Aksen Pembatas
     ty += 24
     draw.line([(W // 2 - 60, ty), (W // 2 + 60, ty)], fill=(13, 148, 136), width=4)
     ty += 40
 
-    # 4. Sub-Hook
     s_lines = textwrap.wrap(sub_text, width=38)
     for line in s_lines:
         l, t, r, b = draw.textbbox((0, 0), line, font=f_sub)
@@ -655,7 +650,6 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
         draw.text(((W - sw) // 2, ty), line, font=f_sub, fill=(203, 213, 225))
         ty += 48
 
-    # 5. Tombol Swipe
     swipe_text = "GESER KE KIRI  ➡️"
     l, t, r, b = draw.textbbox((0, 0), swipe_text, font=f_swipe)
     swp_w = r - l
@@ -664,7 +658,6 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     draw.rounded_rectangle([swp_x - 20, swp_y - 10, swp_x + swp_w + 20, swp_y + 36], radius=20, fill=(30, 41, 59))
     draw.text((swp_x, swp_y), swipe_text, font=f_swipe, fill=(248, 250, 252))
 
-    # 6. Footer Branding
     l, t, r, b = draw.textbbox((0, 0), footer_text, font=f_footer)
     fw = r - l
     draw.text(((W - fw) // 2, H - 90), footer_text, font=f_footer, fill=(148, 163, 184))
@@ -690,7 +683,6 @@ def render_content_slide(badge: str, header_title: str, points_list: list, foote
     f_point_body = get_scalable_font(30, bold=False)
     f_footer = get_scalable_font(30, bold=True)
 
-    # 1. Badge Top
     badge_label = f"  {badge}  "
     l, t, r, b = draw.textbbox((0, 0), badge_label, font=f_badge)
     bw, bh = r - l, b - t
@@ -699,7 +691,6 @@ def render_content_slide(badge: str, header_title: str, points_list: list, foote
     draw.rounded_rectangle([bx - 20, by - 8, bx + bw + 20, by + bh + 10], radius=20, fill=(13, 148, 136))
     draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
 
-    # Header
     l, t, r, b = draw.textbbox((0, 0), header_title, font=f_header)
     tw = r - l
     draw.text(((W - tw) // 2, by + bh + 45), header_title, font=f_header, fill=(255, 255, 255))
@@ -707,7 +698,6 @@ def render_content_slide(badge: str, header_title: str, points_list: list, foote
     dy = by + bh + 105
     draw.line([(W // 2 - 40, dy), (W // 2 + 40, dy)], fill=(13, 148, 136), width=3)
 
-    # Poin dalam Card Box
     start_y = dy + 50
     for item in points_list:
         clean_item = re.sub(r"\*+", "", item).strip()
@@ -736,7 +726,6 @@ def render_content_slide(badge: str, header_title: str, points_list: list, foote
 
         start_y = box_y2 + 25
 
-    # Footer
     l, t, r, b = draw.textbbox((0, 0), footer_text, font=f_footer)
     fw = r - l
     draw.text(((W - fw) // 2, H - 90), footer_text, font=f_footer, fill=(148, 163, 184))
@@ -764,7 +753,6 @@ def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text
     f_cta_body = get_scalable_font(32, bold=False)
     f_footer = get_scalable_font(30, bold=True)
 
-    # 1. Badge Top
     badge_label = f"  {badge}  "
     l, t, r, b = draw.textbbox((0, 0), badge_label, font=f_badge)
     bw, bh = r - l, b - t
@@ -773,7 +761,6 @@ def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text
     draw.rounded_rectangle([bx - 20, by - 8, bx + bw + 20, by + bh + 10], radius=20, fill=(13, 148, 136))
     draw.text((bx, by), badge_label, font=f_badge, fill=(255, 255, 255))
 
-    # Header
     header_title = "Langkah Terakhir & Aksi"
     l, t, r, b = draw.textbbox((0, 0), header_title, font=f_header)
     tw = r - l
@@ -782,7 +769,6 @@ def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text
     dy = by + bh + 105
     draw.line([(W // 2 - 40, dy), (W // 2 + 40, dy)], fill=(13, 148, 136), width=3)
 
-    # Point 3 Card
     clean_p3 = re.sub(r"\*+", "", point_text).strip()
     if ":" in clean_p3:
         p_title, p_desc = clean_p3.split(":", 1)
@@ -806,7 +792,6 @@ def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text
         draw.text((box_x1 + 32, curr_y), dl, font=f_point_body, fill=(203, 213, 225))
         curr_y += 38
 
-    # CTA Card Box
     cta_y1 = box_y2 + 40
     clean_cta = re.sub(r"\*+", "", cta_text).strip()
     cta_lines = textwrap.wrap(clean_cta, width=34)
@@ -821,7 +806,6 @@ def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text
         draw.text((box_x1 + 32, cy), cl, font=f_cta_body, fill=(248, 250, 252))
         cy += 42
 
-    # Footer
     l, t, r, b = draw.textbbox((0, 0), footer_text, font=f_footer)
     fw = r - l
     draw.text(((W - fw) // 2, H - 90), footer_text, font=f_footer, fill=(148, 163, 184))
@@ -934,58 +918,104 @@ def render_single_image(badge: str, hook: str, points: list, footer_text: str):
     return bg
 
 def upload_image_cloud(pil_img) -> str:
-    """Mengunggah kartu ke cloud dengan 3 lapisan server backup andal (Litterbox, Tmpfiles, Freeimage)."""
+    """Mengunggah slide ke cloud dengan 5 lapisan server backup otomatis."""
     buf = BytesIO()
-    pil_img.save(buf, format="JPEG", quality=95)
+    pil_img.save(buf, format="JPEG", quality=90)
     img_bytes = buf.getvalue()
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    err_logs = []
 
-    # 1. Coba Litterbox (72h temporary)
+    # 1. Server 0x0.st (Paling stabil dan ramah cloud)
     try:
-        files = {"fileToUpload": ("slide.jpg", img_bytes, "image/jpeg")}
-        r = requests.post("[https://litterbox.catbox.moe/resources/internals/api.php](https://litterbox.catbox.moe/resources/internals/api.php)", data={"reqtype": "fileupload", "time": "72h"}, files=files, headers=headers, timeout=25)
-        if r.status_code == 200 and r.text.strip().startswith("http"):
-            return r.text.strip()
+        r = requests.post("[https://0x0.st](https://0x0.st)", files={"file": ("slide.jpg", img_bytes, "image/jpeg")}, timeout=15)
+        txt = r.text.strip()
+        if r.status_code == 200 and txt.startswith("http"):
+            return txt
+        err_logs.append(f"0x0: {r.status_code}")
     except Exception as e:
-        print(f"Litterbox error: {e}")
+        err_logs.append(f"0x0: {type(e).__name__}")
 
-    # 2. Coba Tmpfiles.org (Direct Download Link)
+    # 2. Server Catbox.moe (Permanen)
     try:
-        files = {"file": ("slide.jpg", img_bytes, "image/jpeg")}
-        r = requests.post("[https://tmpfiles.org/api/v1/upload](https://tmpfiles.org/api/v1/upload)", files=files, headers=headers, timeout=25).json()
-        if "data" in r and "url" in r["data"]:
-            return r["data"]["url"].replace("tmpfiles.org/", "tmpfiles.org/dl/")
+        r = requests.post("[https://catbox.moe/user/api.php](https://catbox.moe/user/api.php)", data={"reqtype": "fileupload"}, files={"fileToUpload": ("slide.jpg", img_bytes, "image/jpeg")}, timeout=20)
+        txt = r.text.strip()
+        if r.status_code == 200 and txt.startswith("http"):
+            return txt
+        err_logs.append(f"Catbox: {r.status_code}")
     except Exception as e:
-        print(f"Tmpfiles error: {e}")
+        err_logs.append(f"Catbox: {type(e).__name__}")
 
-    # 3. Coba Freeimage.host (Base64)
+    # 3. Server Litterbox (72h)
     try:
-        b64 = base64.b64encode(img_bytes).decode("utf-8")
-        data = {"key": "6d207e02198a847aa98d0a2a901485a5", "action": "upload", "source": b64, "format": "json"}
-        r = requests.post("[https://freeimage.host/api/1/upload](https://freeimage.host/api/1/upload)", data=data, headers=headers, timeout=25).json()
-        if "image" in r and "url" in r["image"]:
-            return r["image"]["url"]
+        r = requests.post("[https://litterbox.catbox.moe/resources/internals/api.php](https://litterbox.catbox.moe/resources/internals/api.php)", data={"reqtype": "fileupload", "time": "72h"}, files={"fileToUpload": ("slide.jpg", img_bytes, "image/jpeg")}, timeout=20)
+        txt = r.text.strip()
+        if r.status_code == 200 and txt.startswith("http"):
+            return txt
+        err_logs.append(f"Litterbox: {r.status_code}")
     except Exception as e:
-        print(f"Freeimage error: {e}")
+        err_logs.append(f"Litterbox: {type(e).__name__}")
 
-    raise Exception("Gagal mengunggah slide ke seluruh server penyimpanan cloud.")
+    # 4. Server Tmpfiles.org
+    try:
+        r = requests.post("[https://tmpfiles.org/api/v1/upload](https://tmpfiles.org/api/v1/upload)", files={"file": ("slide.jpg", img_bytes, "image/jpeg")}, timeout=20)
+        if r.status_code == 200:
+            res_json = r.json()
+            if "data" in res_json and "url" in res_json["data"]:
+                return res_json["data"]["url"].replace("tmpfiles.org/", "tmpfiles.org/dl/")
+        err_logs.append(f"Tmpfiles: {r.status_code}")
+    except Exception as e:
+        err_logs.append(f"Tmpfiles: {type(e).__name__}")
+
+    # 5. Server Imgur CDN
+    try:
+        headers = {"Authorization": "Client-ID 546c25a59c58ad7"}
+        r = requests.post("[https://api.imgur.com/3/image](https://api.imgur.com/3/image)", headers=headers, files={"image": img_bytes}, timeout=20)
+        if r.status_code == 200:
+            res_json = r.json()
+            if "data" in res_json and "link" in res_json["data"]:
+                return res_json["data"]["link"]
+        err_logs.append(f"Imgur: {r.status_code}")
+    except Exception as e:
+        err_logs.append(f"Imgur: {type(e).__name__}")
+
+    raise Exception(f"Gagal mengunggah slide ke cloud: {', '.join(err_logs)}")
 
 def upload_video_cloud(file_obj, filename="video.mp4") -> str:
+    if hasattr(file_obj, "getvalue"):
+        data_bytes = file_obj.getvalue()
+    elif hasattr(file_obj, "read"):
+        data_bytes = file_obj.read()
+    else:
+        data_bytes = file_obj
+
+    # 1. Coba 0x0.st
     try:
-        url = "[https://litterbox.catbox.moe/resources/internals/api.php](https://litterbox.catbox.moe/resources/internals/api.php)"
-        if hasattr(file_obj, "getvalue"):
-            data_bytes = file_obj.getvalue()
-        elif hasattr(file_obj, "read"):
-            data_bytes = file_obj.read()
-        else:
-            data_bytes = file_obj
+        files = {"file": (filename, data_bytes, "video/mp4")}
+        r = requests.post("[https://0x0.st](https://0x0.st)", files=files, timeout=45)
+        if r.status_code == 200 and r.text.strip().startswith("http"):
+            return r.text.strip()
+    except Exception:
+        pass
+
+    # 2. Coba Catbox
+    try:
         files = {"fileToUpload": (filename, data_bytes, "video/mp4")}
-        data = {"reqtype": "fileupload", "time": "72h"}
-        res = requests.post(url, data=data, files=files, timeout=60)
+        data = {"reqtype": "fileupload"}
+        res = requests.post("[https://catbox.moe/user/api.php](https://catbox.moe/user/api.php)", data=data, files=files, timeout=60)
         if res.status_code == 200 and res.text.strip().startswith("http"):
             return res.text.strip()
-    except Exception as e:
-        print(f"Litterbox video error: {e}")
+    except Exception:
+        pass
+
+    # 3. Coba Litterbox
+    try:
+        files = {"fileToUpload": (filename, data_bytes, "video/mp4")}
+        data = {"reqtype": "fileupload", "time": "72h"}
+        res = requests.post("[https://litterbox.catbox.moe/resources/internals/api.php](https://litterbox.catbox.moe/resources/internals/api.php)", data=data, files=files, timeout=60)
+        if res.status_code == 200 and res.text.strip().startswith("http"):
+            return res.text.strip()
+    except Exception:
+        pass
+
     return ""
 
 # ==================== ENGINE PENERBITAN INSTAGRAM ====================
@@ -1403,24 +1433,27 @@ with tab_studio:
                         "caption": caption_edited,
                         "status": "PENDING"
                     }
-                    if "CAROUSEL" in media_type:
-                        urls = [upload_image_cloud(img) for img in st.session_state["rendered_slides"]]
-                        new_entry["carousel_urls"] = urls
-                    elif "IMAGE" in media_type:
-                        new_entry["image_url"] = upload_image_cloud(st.session_state["rendered_slides"][0])
-                    elif "REELS" in media_type:
-                        if st.session_state.get("reels_is_uploaded", False) and uploaded_video_file is not None:
-                            new_entry["video_url"] = upload_video_cloud(uploaded_video_file, uploaded_video_file.name)
-                        else:
-                            new_entry["video_url"] = custom_media if custom_media else "[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)"
-                    
-                    posts.append(new_entry)
-                    save_posts(posts)
-                    st.success(f"🎉 Sukses! Draf `{new_id}` berhasil dimasukkan ke antrean posts.json bertanda PENDING!")
+                    try:
+                        if "CAROUSEL" in media_type:
+                            urls = [upload_image_cloud(img) for img in st.session_state["rendered_slides"]]
+                            new_entry["carousel_urls"] = urls
+                        elif "IMAGE" in media_type:
+                            new_entry["image_url"] = upload_image_cloud(st.session_state["rendered_slides"][0])
+                        elif "REELS" in media_type:
+                            if st.session_state.get("reels_is_uploaded", False) and uploaded_video_file is not None:
+                                new_entry["video_url"] = upload_video_cloud(uploaded_video_file, uploaded_video_file.name)
+                            else:
+                                new_entry["video_url"] = custom_media if custom_media else "[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)"
+                        
+                        posts.append(new_entry)
+                        save_posts(posts)
+                        st.success(f"🎉 Sukses! Draf `{new_id}` berhasil dimasukkan ke antrean posts.json bertanda PENDING!")
+                    except Exception as err:
+                        st.error(f"Gagal menyimpan ke antrean: {err}")
 
         with col_act_pub:
             if st.button("🚀 Simpan & Publish Langsung ke Instagram!", type="primary"):
-                with st.spinner("Mengunggah media dan menerbitkan langsung ke akun Instagram @ishak_radjab..."):
+                with st.spinner("Mengunggah slide ke cloud server dan menerbitkan langsung ke akun Instagram @ishak_radjab..."):
                     posts = load_posts()
                     new_id = f"post-{len(posts) + 1:03d}"
                     new_entry = {
