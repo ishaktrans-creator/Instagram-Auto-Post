@@ -1,7 +1,6 @@
 import os
 import json
 import requests
-import urllib.request
 import textwrap
 import time
 import re
@@ -12,9 +11,9 @@ import zoneinfo
 from PIL import Image, ImageDraw, ImageFont
 import streamlit as st
 
-# 1. Bersihkan variabel proxy bawaan sistem yang memicu InvalidSchema di cloud
-for k in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
-    if k in os.environ:
+# 1. Bersihkan seluruh variabel proxy lingkungan dari sistem
+for k in list(os.environ.keys()):
+    if "proxy" in k.lower():
         del os.environ[k]
 
 st.set_page_config(
@@ -472,6 +471,7 @@ def generate_caption_ai(topic: str, revision_note: str = "") -> str:
 
     s = requests.Session()
     s.trust_env = False
+    s.proxies = {"http": None, "https": None}
 
     for attempt in range(1, 4):
         try:
@@ -528,6 +528,7 @@ def research_30_ideas_ai(niche_name: str) -> list:
     
     s = requests.Session()
     s.trust_env = False
+    s.proxies = {"http": None, "https": None}
     try:
         res = s.post(url, json=payload, timeout=60).json()
         if "candidates" in res and res["candidates"]:
@@ -619,6 +620,7 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     try:
         s = requests.Session()
         s.trust_env = False
+        s.proxies = {"http": None, "https": None}
         r = s.get(bg_url, timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
@@ -683,6 +685,7 @@ def render_content_slide(badge: str, header_title: str, points_list: list, foote
     try:
         s = requests.Session()
         s.trust_env = False
+        s.proxies = {"http": None, "https": None}
         r = s.get(bg_url, timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
@@ -753,6 +756,7 @@ def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text
     try:
         s = requests.Session()
         s.trust_env = False
+        s.proxies = {"http": None, "https": None}
         r = s.get(bg_url, timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
@@ -835,6 +839,7 @@ def render_reels_cover_slide(badge: str, raw_hook: str, footer_text: str):
     try:
         s = requests.Session()
         s.trust_env = False
+        s.proxies = {"http": None, "https": None}
         r = s.get(bg_url, timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
@@ -887,6 +892,7 @@ def render_single_image(badge: str, hook: str, points: list, footer_text: str):
     try:
         s = requests.Session()
         s.trust_env = False
+        s.proxies = {"http": None, "https": None}
         r = s.get(bg_url, timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
@@ -939,7 +945,7 @@ def render_single_image(badge: str, hook: str, points: list, footer_text: str):
     return bg
 
 def upload_image_cloud(pil_img) -> str:
-    """Mengunggah slide ke cloud dengan session bebas proxy + proteksi urllib."""
+    """Mengunggah slide ke cloud via ImgBB API resmi (bebas blokir proxy)."""
     buf = BytesIO()
     pil_img.save(buf, format="JPEG", quality=90)
     img_bytes = buf.getvalue()
@@ -947,8 +953,38 @@ def upload_image_cloud(pil_img) -> str:
 
     s = requests.Session()
     s.trust_env = False
+    s.proxies = {"http": None, "https": None}
+    adapter = requests.adapters.HTTPAdapter(max_retries=2)
+    s.mount("https://", adapter)
+    s.mount("http://", adapter)
 
-    # 1. Catbox.moe
+    # 1. Jalur Utama: ImgBB API Resmi (Whitelisted di AWS & Streamlit)
+    try:
+        b64_img = base64.b64encode(img_bytes).decode("utf-8")
+        payload = {"key": "232565fc1a4f0d24578d9aeadc0b43ab", "image": b64_img}
+        r = s.post("[https://api.imgbb.com/1/upload](https://api.imgbb.com/1/upload)", data=payload, timeout=30)
+        if r.status_code == 200:
+            res_j = r.json()
+            if "data" in res_j and "url" in res_j["data"]:
+                return res_j["data"]["url"]
+        err_logs.append(f"ImgBB: {r.status_code}")
+    except Exception as e:
+        err_logs.append(f"ImgBB: {str(e)}")
+
+    # 2. Jalur Cadangan 1: Freeimage.host (Base64)
+    try:
+        b64_img = base64.b64encode(img_bytes).decode("utf-8")
+        data = {"key": "6d207e02198a847aa98d0a2a901485a5", "action": "upload", "source": b64_img, "format": "json"}
+        r = s.post("[https://freeimage.host/api/1/upload](https://freeimage.host/api/1/upload)", data=data, timeout=30)
+        if r.status_code == 200:
+            res_j = r.json()
+            if "image" in res_j and "url" in res_j["image"]:
+                return res_j["image"]["url"]
+        err_logs.append(f"Freeimage: {r.status_code}")
+    except Exception as e:
+        err_logs.append(f"Freeimage: {str(e)}")
+
+    # 3. Jalur Cadangan 2: Catbox.moe
     try:
         data = {"reqtype": "fileupload"}
         files = {"fileToUpload": ("slide.jpg", img_bytes, "image/jpeg")}
@@ -958,65 +994,7 @@ def upload_image_cloud(pil_img) -> str:
             return txt
         err_logs.append(f"Catbox: {r.status_code}")
     except Exception as e:
-        err_logs.append(f"Catbox: {type(e).__name__}")
-
-    # 2. 0x0.st
-    try:
-        files = {"file": ("slide.jpg", img_bytes, "image/jpeg")}
-        r = s.post("[https://0x0.st](https://0x0.st)", files=files, timeout=20)
-        txt = r.text.strip()
-        if r.status_code == 200 and txt.startswith("http"):
-            return txt
-        err_logs.append(f"0x0: {r.status_code}")
-    except Exception as e:
-        err_logs.append(f"0x0: {type(e).__name__}")
-
-    # 3. Litterbox (72h)
-    try:
-        data = {"reqtype": "fileupload", "time": "72h"}
-        files = {"fileToUpload": ("slide.jpg", img_bytes, "image/jpeg")}
-        r = s.post("[https://litterbox.catbox.moe/resources/internals/api.php](https://litterbox.catbox.moe/resources/internals/api.php)", data=data, files=files, timeout=20)
-        txt = r.text.strip()
-        if r.status_code == 200 and txt.startswith("http"):
-            return txt
-        err_logs.append(f"Litterbox: {r.status_code}")
-    except Exception as e:
-        err_logs.append(f"Litterbox: {type(e).__name__}")
-
-    # 4. Tmpfiles.org
-    try:
-        files = {"file": ("slide.jpg", img_bytes, "image/jpeg")}
-        r = s.post("[https://tmpfiles.org/api/v1/upload](https://tmpfiles.org/api/v1/upload)", files=files, timeout=20)
-        if r.status_code == 200:
-            res_json = r.json()
-            if "data" in res_json and "url" in res_json["data"]:
-                return res_json["data"]["url"].replace("tmpfiles.org/", "tmpfiles.org/dl/")
-        err_logs.append(f"Tmpfiles: {r.status_code}")
-    except Exception as e:
-        err_logs.append(f"Tmpfiles: {type(e).__name__}")
-
-    # 5. Jalur Darurat: urllib bawaan Python murni
-    try:
-        boundary = "----AutoPostBoundary777"
-        body = (
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="reqtype"\r\n\r\n'
-            f"fileupload\r\n"
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="fileToUpload"; filename="slide.jpg"\r\n'
-            f"Content-Type: image/jpeg\r\n\r\n"
-        ).encode("utf-8") + img_bytes + f"\r\n--{boundary}--\r\n".encode("utf-8")
-
-        req = urllib.request.Request("[https://catbox.moe/user/api.php](https://catbox.moe/user/api.php)", data=body)
-        req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
-        req.add_header("User-Agent", "Mozilla/5.0")
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            raw_res = resp.read().decode("utf-8").strip()
-            if raw_res.startswith("http"):
-                return raw_res
-            err_logs.append(f"urllib: {raw_res[:30]}")
-    except Exception as e:
-        err_logs.append(f"urllib: {type(e).__name__}")
+        err_logs.append(f"Catbox: {str(e)}")
 
     raise Exception(f"Gagal mengunggah slide ke cloud: {', '.join(err_logs)}")
 
@@ -1030,6 +1008,7 @@ def upload_video_cloud(file_obj, filename="video.mp4") -> str:
 
     s = requests.Session()
     s.trust_env = False
+    s.proxies = {"http": None, "https": None}
 
     try:
         files = {"fileToUpload": (filename, data_bytes, "video/mp4")}
@@ -1037,14 +1016,6 @@ def upload_video_cloud(file_obj, filename="video.mp4") -> str:
         res = s.post("[https://catbox.moe/user/api.php](https://catbox.moe/user/api.php)", data=data, files=files, timeout=60)
         if res.status_code == 200 and res.text.strip().startswith("http"):
             return res.text.strip()
-    except Exception:
-        pass
-
-    try:
-        files = {"file": (filename, data_bytes, "video/mp4")}
-        r = s.post("[https://0x0.st](https://0x0.st)", files=files, timeout=45)
-        if r.status_code == 200 and r.text.strip().startswith("http"):
-            return r.text.strip()
     except Exception:
         pass
 
@@ -1060,6 +1031,7 @@ def create_instagram_container_direct(post: dict) -> str:
 
     s = requests.Session()
     s.trust_env = False
+    s.proxies = {"http": None, "https": None}
 
     if "carousel_urls" in post and isinstance(post["carousel_urls"], list) and len(post["carousel_urls"]) > 1:
         children_ids = []
@@ -1122,6 +1094,7 @@ def wait_for_media_ready_direct(container_id: str, max_wait_seconds: int = 180):
     params = {"fields": "status_code,status", "access_token": META_ACCESS_TOKEN}
     s = requests.Session()
     s.trust_env = False
+    s.proxies = {"http": None, "https": None}
     start = time.time()
     while time.time() - start < max_wait_seconds:
         res = s.get(url, params=params, timeout=20).json()
@@ -1139,6 +1112,7 @@ def publish_to_instagram_direct(container_id: str) -> str:
     url = f"{GRAPH_API_URL}/{IG_USER_ID}/media_publish"
     s = requests.Session()
     s.trust_env = False
+    s.proxies = {"http": None, "https": None}
     res = s.post(url, params={"creation_id": container_id, "access_token": META_ACCESS_TOKEN}, timeout=30).json()
     if "id" not in res:
         raise Exception(f"Gagal publish ke Instagram: {res}")
@@ -1492,7 +1466,7 @@ with tab_studio:
 
         with col_act_pub:
             if st.button("🚀 Simpan & Publish Langsung ke Instagram!", type="primary"):
-                with st.spinner("Mengunggah slide ke cloud server dan menerbitkan langsung ke akun Instagram @ishak_radjab..."):
+                with st.spinner("Mengunggah slide via ImgBB dan menerbitkan langsung ke akun Instagram @ishak_radjab..."):
                     posts = load_posts()
                     new_id = f"post-{len(posts) + 1:03d}"
                     new_entry = {
