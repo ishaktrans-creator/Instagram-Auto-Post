@@ -1640,10 +1640,6 @@ with tab_status:
         else:
             st.error("Tidak Ditemukan")
     with k2:
-        st.write(")")
-        else:
-            st.error("Tidak Ditemukan")
-    with k2:
         st.write("📸 **Instagram Business ID**")
         if IG_USER_ID:
             st.success(f"ID: `{IG_USER_ID}`")
