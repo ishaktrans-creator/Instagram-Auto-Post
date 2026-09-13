@@ -950,81 +950,75 @@ def render_single_image(badge: str, hook: str, points: list, footer_text: str):
     return bg
 
 def upload_image_cloud(pil_img, custom_key="") -> str:
-    """Mengunggah slide ke cloud dengan proteksi URL murni (bebas kurung siku '[' dan bebas proxy)."""
+    """Mengunggah slide ke cloud dengan multi-jalur: ImgBB Key Query + Catbox + Litterbox."""
     buf = BytesIO()
     pil_img.save(buf, format="JPEG", quality=90)
     img_bytes = buf.getvalue()
-    b64_img = base64.b64encode(img_bytes).decode("utf-8")
     err_logs = []
 
     s = requests.Session()
     s.trust_env = False
     s.proxies = {"http": "", "https": ""}
 
-    # 1. Custom ImgBB Key (jika diisi pengguna di sidebar)
-    if custom_key:
+    # 1. Jalur Utama: Catbox.moe (Gratis, Tanpa API Key, Teruji)
+    try:
+        url = clean_url("[https://catbox.moe/user/api.php](https://catbox.moe/user/api.php)")
+        data = {"reqtype": "fileupload"}
+        files = {"fileToUpload": ("slide.jpg", img_bytes, "image/jpeg")}
+        r = s.post(url, data=data, files=files, timeout=25)
+        txt = r.text.strip()
+        if r.status_code == 200 and txt.startswith("http"):
+            return clean_url(txt)
+        err_logs.append(f"Catbox: HTTP {r.status_code}")
+    except Exception as e:
+        err_logs.append(f"Catbox: {str(e)[:30]}")
+
+    # 2. Jalur Cadangan: Litterbox (Catbox CDN 72 Jam)
+    try:
+        url = clean_url("[https://litterbox.catbox.moe/resources/internals/api.php](https://litterbox.catbox.moe/resources/internals/api.php)")
+        data = {"reqtype": "fileupload", "time": "72h"}
+        files = {"fileToUpload": ("slide.jpg", img_bytes, "image/jpeg")}
+        r = s.post(url, data=data, files=files, timeout=25)
+        txt = r.text.strip()
+        if r.status_code == 200 and txt.startswith("http"):
+            return clean_url(txt)
+        err_logs.append(f"Litterbox: HTTP {r.status_code}")
+    except Exception as e:
+        err_logs.append(f"Litterbox: {str(e)[:30]}")
+
+    # 3. Jalur ImgBB dengan Key (Jika diisi di sidebar atau secrets)
+    candidate_keys = []
+    if custom_key and custom_key.strip():
+        candidate_keys.append(custom_key.strip())
+    sec_key = get_secret("IMGBB_API_KEY")
+    if sec_key and sec_key not in candidate_keys:
+        candidate_keys.append(sec_key)
+    candidate_keys.append("762894e2014f83c023b233b2f10395e2")
+
+    for k in candidate_keys:
         try:
-            target_url = clean_url("[https://api.imgbb.com/1/upload](https://api.imgbb.com/1/upload)")
-            r = s.post(target_url, data={"key": custom_key.strip(), "image": b64_img}, timeout=25)
+            url = clean_url(f"[https://api.imgbb.com/1/upload?key=](https://api.imgbb.com/1/upload?key=){k}")
+            files = {"image": ("slide.jpg", img_bytes, "image/jpeg")}
+            r = s.post(url, files=files, timeout=25)
             if r.status_code == 200:
                 res_j = r.json()
                 if "data" in res_j and "url" in res_j["data"]:
                     return clean_url(res_j["data"]["url"])
-            err_logs.append(f"Custom ImgBB: HTTP {r.status_code}")
+            err_logs.append(f"ImgBB: HTTP {r.status_code}")
         except Exception as e:
-            err_logs.append(f"Custom ImgBB: {str(e)[:40]}")
+            err_logs.append(f"ImgBB: {str(e)[:30]}")
 
-    # 2. Imgur CDN Resmi (Client-ID publik)
+    # 4. Jalur Cadangan: 0x0.st
     try:
-        target_url = clean_url("[https://api.imgur.com/3/image](https://api.imgur.com/3/image)")
-        headers = {"Authorization": "Client-ID 546c25a59c58ad7"}
-        r = s.post(target_url, headers=headers, data={"image": b64_img, "type": "base64"}, timeout=25)
-        if r.status_code == 200:
-            res_j = r.json()
-            if "data" in res_j and "link" in res_j["data"]:
-                return clean_url(res_j["data"]["link"])
-        err_logs.append(f"Imgur: HTTP {r.status_code}")
-    except Exception as e:
-        err_logs.append(f"Imgur: {str(e)[:40]}")
-
-    # 3. Freeimage.host API (Base64)
-    try:
-        target_url = clean_url("[https://freeimage.host/api/1/upload](https://freeimage.host/api/1/upload)")
-        data = {"key": "6d207e02198a847aa98d0a2a901485a5", "action": "upload", "source": b64_img, "format": "json"}
-        r = s.post(target_url, data=data, timeout=25)
-        if r.status_code == 200:
-            res_j = r.json()
-            if "image" in res_j and "url" in res_j["image"]:
-                return clean_url(res_j["image"]["url"])
-        err_logs.append(f"Freeimage: HTTP {r.status_code}")
-    except Exception as e:
-        err_logs.append(f"Freeimage: {str(e)[:40]}")
-
-    # 4. ImgBB Backup CDN
-    try:
-        target_url = clean_url("[https://api.imgbb.com/1/upload](https://api.imgbb.com/1/upload)")
-        r = s.post(target_url, data={"key": "232565fc1a4f0d24578d9aeadc0b43ab", "image": b64_img}, timeout=25)
-        if r.status_code == 200:
-            res_j = r.json()
-            if "data" in res_j and "url" in res_j["data"]:
-                return clean_url(res_j["data"]["url"])
-        err_logs.append(f"ImgBB: HTTP {r.status_code}")
-    except Exception as e:
-        err_logs.append(f"ImgBB: {str(e)[:40]}")
-
-    # 5. Tmpfiles.org API
-    try:
-        target_url = clean_url("[https://tmpfiles.org/api/v1/upload](https://tmpfiles.org/api/v1/upload)")
+        url = clean_url("[https://0x0.st](https://0x0.st)")
         files = {"file": ("slide.jpg", img_bytes, "image/jpeg")}
-        r = s.post(target_url, files=files, timeout=20)
-        if r.status_code == 200:
-            res_j = r.json()
-            if "data" in res_j and "url" in res_j["data"]:
-                dl_url = res_j["data"]["url"].replace("tmpfiles.org/", "tmpfiles.org/dl/")
-                return clean_url(dl_url)
-        err_logs.append(f"Tmpfiles: HTTP {r.status_code}")
+        r = s.post(url, files=files, timeout=20)
+        txt = r.text.strip()
+        if r.status_code == 200 and txt.startswith("http"):
+            return clean_url(txt)
+        err_logs.append(f"0x0: HTTP {r.status_code}")
     except Exception as e:
-        err_logs.append(f"Tmpfiles: {str(e)[:40]}")
+        err_logs.append(f"0x0: {str(e)[:30]}")
 
     raise Exception(f"Gagal mengunggah slide: {', '.join(err_logs)}")
 
@@ -1208,7 +1202,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     branding_handle = st.text_input("Branding Footer Gambar", value="@ishak_radjab")
-    custom_imgbb_key = st.text_input("ImgBB Key (Opsional)", type="password", help="Bisa dikosongkan. Gunakan key pribadi dari api.imgbb.com jika ingin jalur privat.")
+    custom_imgbb_key = st.text_input("ImgBB Key (Opsional)", type="password", help="Bisa dikosongkan. Dapatkan key gratis pribadi di api.imgbb.com.")
 
     st.markdown("""
     <div style="background: rgba(18, 24, 38, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 14px; margin-top: 24px;">
@@ -1643,6 +1637,10 @@ with tab_status:
         st.write("🔑 **Meta Access Token**")
         if META_ACCESS_TOKEN:
             st.success("Terkonfigurasi (Aktif)")
+        else:
+            st.error("Tidak Ditemukan")
+    with k2:
+        st.write(")")
         else:
             st.error("Tidak Ditemukan")
     with k2:
