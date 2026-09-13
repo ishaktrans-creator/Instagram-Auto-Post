@@ -16,6 +16,11 @@ for k in list(os.environ.keys()):
     if "proxy" in k.lower():
         del os.environ[k]
 
+def clean_url(u: str) -> str:
+    """Membersihkan URL dari karakter kurung siku '[', ']', spasi, atau kutip akibat copy-paste."""
+    cleaned = re.sub(r"^[^a-zA-Z]+", "", str(u).strip())
+    return cleaned.strip(" \t\n\r[]()\"'")
+
 st.set_page_config(
     page_title="AutoPost Studio - Enterprise Instagram Automation",
     page_icon="⚡",
@@ -446,12 +451,12 @@ Buatkan satu materi caption Instagram lengkap berbahasa Indonesia dengan topik: 
 
 Format output WAJIB mengikuti struktur ini secara berurutan:
 1. Baris 1: Badge Kategori dalam tanda kurung siku, contoh: [FINANCE], [TIPS BISNIS], atau [MOTIVATIONAL].
-2. Baris 2: Judul / HOOK yang tajam dan menghentikan scrolling (1-2 kalimat menarik).
+2. Baris 2: Judul / HOOK yang tajam, utuh, tidak terpotong di tengah kalimat, dan langsung menghentikan scrolling (1-2 kalimat tuntas).
 3. Baris 3-6: Poin-poin edukasi atau wawasan praktis (gunakan penomoran 1, 2, 3) yang padat, bernas, dan mudah dipahami.
 4. Baris 7: Call to Action (CTA) interaktif (contoh: "Ketik kata kunci tertentu di komentar untuk diskusi lebih lanjut!").
 5. Baris 8: 5 sampai 8 hashtag yang relevan dan bertarget.
 
-PENTING: Jangan tambahkan kata pengantar atau basa-basi apa pun. Tulis langsung teks caption-nya dari baris pertama hingga terakhir.
+PENTING: Jangan tambahkan kata pengantar atau basa-basi apa pun. Pastikan Judul/Hook ditulis lengkap dan tidak menggantung.
 """
 
 def generate_caption_ai(topic: str, revision_note: str = "") -> str:
@@ -463,7 +468,7 @@ def generate_caption_ai(topic: str, revision_note: str = "") -> str:
     if revision_note:
         final_prompt += f"\n\nCATATAN REVISI TAMBAHAN DARI PENGGUNA: Tolong sesuaikan materi dengan instruksi khusus ini: '{revision_note}'."
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
+    url = clean_url(f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}")
     payload = {
         "contents": [{"parts": [{"text": final_prompt}]}],
         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1000}
@@ -520,7 +525,7 @@ def research_30_ideas_ai(niche_name: str) -> list:
     Berikan JSON murni tanpa markdown pembungkus.
     """
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
+    url = clean_url(f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}")
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.8, "maxOutputTokens": 4000}
@@ -621,7 +626,7 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
         s = requests.Session()
         s.trust_env = False
         s.proxies = {"http": "", "https": ""}
-        r = s.get(bg_url, timeout=10)
+        r = s.get(clean_url(bg_url), timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
         bg = Image.new("RGB", (W, H), (15, 23, 42))
@@ -686,7 +691,7 @@ def render_content_slide(badge: str, header_title: str, points_list: list, foote
         s = requests.Session()
         s.trust_env = False
         s.proxies = {"http": "", "https": ""}
-        r = s.get(bg_url, timeout=10)
+        r = s.get(clean_url(bg_url), timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
         bg = Image.new("RGB", (W, H), (15, 23, 42))
@@ -757,7 +762,7 @@ def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text
         s = requests.Session()
         s.trust_env = False
         s.proxies = {"http": "", "https": ""}
-        r = s.get(bg_url, timeout=10)
+        r = s.get(clean_url(bg_url), timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
         bg = Image.new("RGB", (W, H), (15, 23, 42))
@@ -840,7 +845,7 @@ def render_reels_cover_slide(badge: str, raw_hook: str, footer_text: str):
         s = requests.Session()
         s.trust_env = False
         s.proxies = {"http": "", "https": ""}
-        r = s.get(bg_url, timeout=10)
+        r = s.get(clean_url(bg_url), timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
         bg = Image.new("RGB", (W, H), (15, 23, 42))
@@ -893,7 +898,7 @@ def render_single_image(badge: str, hook: str, points: list, footer_text: str):
         s = requests.Session()
         s.trust_env = False
         s.proxies = {"http": "", "https": ""}
-        r = s.get(bg_url, timeout=10)
+        r = s.get(clean_url(bg_url), timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
         bg = Image.new("RGB", (W, H), (15, 23, 42))
@@ -945,7 +950,7 @@ def render_single_image(badge: str, hook: str, points: list, footer_text: str):
     return bg
 
 def upload_image_cloud(pil_img, custom_key="") -> str:
-    """Mengunggah slide ke cloud dengan 5 lapisan server CDN resmi tanpa memodifikasi adapter bawaan."""
+    """Mengunggah slide ke cloud dengan proteksi URL murni (bebas kurung siku '[' dan bebas proxy)."""
     buf = BytesIO()
     pil_img.save(buf, format="JPEG", quality=90)
     img_bytes = buf.getvalue()
@@ -959,61 +964,67 @@ def upload_image_cloud(pil_img, custom_key="") -> str:
     # 1. Custom ImgBB Key (jika diisi pengguna di sidebar)
     if custom_key:
         try:
-            r = s.post("[https://api.imgbb.com/1/upload](https://api.imgbb.com/1/upload)", data={"key": custom_key, "image": b64_img}, timeout=25)
+            target_url = clean_url("[https://api.imgbb.com/1/upload](https://api.imgbb.com/1/upload)")
+            r = s.post(target_url, data={"key": custom_key.strip(), "image": b64_img}, timeout=25)
             if r.status_code == 200:
                 res_j = r.json()
                 if "data" in res_j and "url" in res_j["data"]:
-                    return res_j["data"]["url"]
+                    return clean_url(res_j["data"]["url"])
             err_logs.append(f"Custom ImgBB: HTTP {r.status_code}")
         except Exception as e:
-            err_logs.append(f"Custom ImgBB: {str(e)[:50]}")
+            err_logs.append(f"Custom ImgBB: {str(e)[:40]}")
 
     # 2. Imgur CDN Resmi (Client-ID publik)
     try:
+        target_url = clean_url("[https://api.imgur.com/3/image](https://api.imgur.com/3/image)")
         headers = {"Authorization": "Client-ID 546c25a59c58ad7"}
-        r = s.post("[https://api.imgur.com/3/image](https://api.imgur.com/3/image)", headers=headers, data={"image": b64_img, "type": "base64"}, timeout=25)
+        r = s.post(target_url, headers=headers, data={"image": b64_img, "type": "base64"}, timeout=25)
         if r.status_code == 200:
             res_j = r.json()
             if "data" in res_j and "link" in res_j["data"]:
-                return res_j["data"]["link"]
+                return clean_url(res_j["data"]["link"])
         err_logs.append(f"Imgur: HTTP {r.status_code}")
     except Exception as e:
-        err_logs.append(f"Imgur: {str(e)[:50]}")
+        err_logs.append(f"Imgur: {str(e)[:40]}")
 
     # 3. Freeimage.host API (Base64)
     try:
+        target_url = clean_url("[https://freeimage.host/api/1/upload](https://freeimage.host/api/1/upload)")
         data = {"key": "6d207e02198a847aa98d0a2a901485a5", "action": "upload", "source": b64_img, "format": "json"}
-        r = s.post("[https://freeimage.host/api/1/upload](https://freeimage.host/api/1/upload)", data=data, timeout=25)
+        r = s.post(target_url, data=data, timeout=25)
         if r.status_code == 200:
             res_j = r.json()
             if "image" in res_j and "url" in res_j["image"]:
-                return res_j["image"]["url"]
+                return clean_url(res_j["image"]["url"])
         err_logs.append(f"Freeimage: HTTP {r.status_code}")
     except Exception as e:
-        err_logs.append(f"Freeimage: {str(e)[:50]}")
+        err_logs.append(f"Freeimage: {str(e)[:40]}")
 
     # 4. ImgBB Backup CDN
     try:
-        r = s.post("[https://api.imgbb.com/1/upload](https://api.imgbb.com/1/upload)", data={"key": "232565fc1a4f0d24578d9aeadc0b43ab", "image": b64_img}, timeout=25)
+        target_url = clean_url("[https://api.imgbb.com/1/upload](https://api.imgbb.com/1/upload)")
+        r = s.post(target_url, data={"key": "232565fc1a4f0d24578d9aeadc0b43ab", "image": b64_img}, timeout=25)
         if r.status_code == 200:
             res_j = r.json()
             if "data" in res_j and "url" in res_j["data"]:
-                return res_j["data"]["url"]
+                return clean_url(res_j["data"]["url"])
         err_logs.append(f"ImgBB: HTTP {r.status_code}")
     except Exception as e:
-        err_logs.append(f"ImgBB: {str(e)[:50]}")
+        err_logs.append(f"ImgBB: {str(e)[:40]}")
 
     # 5. Tmpfiles.org API
     try:
+        target_url = clean_url("[https://tmpfiles.org/api/v1/upload](https://tmpfiles.org/api/v1/upload)")
         files = {"file": ("slide.jpg", img_bytes, "image/jpeg")}
-        r = s.post("[https://tmpfiles.org/api/v1/upload](https://tmpfiles.org/api/v1/upload)", files=files, timeout=20)
+        r = s.post(target_url, files=files, timeout=20)
         if r.status_code == 200:
             res_j = r.json()
             if "data" in res_j and "url" in res_j["data"]:
-                return res_j["data"]["url"].replace("tmpfiles.org/", "tmpfiles.org/dl/")
+                dl_url = res_j["data"]["url"].replace("tmpfiles.org/", "tmpfiles.org/dl/")
+                return clean_url(dl_url)
         err_logs.append(f"Tmpfiles: HTTP {r.status_code}")
     except Exception as e:
-        err_logs.append(f"Tmpfiles: {str(e)[:50]}")
+        err_logs.append(f"Tmpfiles: {str(e)[:40]}")
 
     raise Exception(f"Gagal mengunggah slide: {', '.join(err_logs)}")
 
@@ -1030,11 +1041,12 @@ def upload_video_cloud(file_obj, filename="video.mp4") -> str:
     s.proxies = {"http": "", "https": ""}
 
     try:
+        target_url = clean_url("[https://catbox.moe/user/api.php](https://catbox.moe/user/api.php)")
         files = {"fileToUpload": (filename, data_bytes, "video/mp4")}
         data = {"reqtype": "fileupload"}
-        res = s.post("[https://catbox.moe/user/api.php](https://catbox.moe/user/api.php)", data=data, files=files, timeout=60)
+        res = s.post(target_url, data=data, files=files, timeout=60)
         if res.status_code == 200 and res.text.strip().startswith("http"):
-            return res.text.strip()
+            return clean_url(res.text.strip())
     except Exception:
         pass
 
@@ -1045,7 +1057,7 @@ def create_instagram_container_direct(post: dict, status_box=None) -> str:
     if not META_ACCESS_TOKEN or not IG_USER_ID:
         raise Exception("Kredensial META_ACCESS_TOKEN atau IG_USER_ID belum terpasang.")
 
-    url = f"{GRAPH_API_URL}/{IG_USER_ID}/media"
+    url = clean_url(f"{GRAPH_API_URL}/{IG_USER_ID}/media")
     caption = post.get("caption", "")
 
     s = requests.Session()
@@ -1055,13 +1067,14 @@ def create_instagram_container_direct(post: dict, status_box=None) -> str:
     if "carousel_urls" in post and isinstance(post["carousel_urls"], list) and len(post["carousel_urls"]) > 1:
         children_ids = []
         for idx, img_url in enumerate(post["carousel_urls"], 1):
-            if not img_url or not img_url.startswith("http"):
+            c_url = clean_url(img_url)
+            if not c_url or not c_url.startswith("http"):
                 raise Exception("Terdapat tautan gambar slide yang kosong atau tidak valid.")
             if status_box:
                 status_box.write(f"📤 Menghubungkan Slide {idx} ke Meta Instagram...")
                 
             child_payload = {
-                "image_url": img_url,
+                "image_url": c_url,
                 "is_carousel_item": "true",
                 "access_token": META_ACCESS_TOKEN
             }
@@ -1089,7 +1102,7 @@ def create_instagram_container_direct(post: dict, status_box=None) -> str:
             status_box.write("🎬 Mendaftarkan video Reels ke Meta...")
         payload = {
             "media_type": "REELS",
-            "video_url": post["video_url"],
+            "video_url": clean_url(post["video_url"]),
             "caption": caption,
             "share_to_feed": "true",
             "access_token": META_ACCESS_TOKEN
@@ -1100,7 +1113,7 @@ def create_instagram_container_direct(post: dict, status_box=None) -> str:
         return res["id"]
 
     else:
-        img_url = post.get("image_url", "")
+        img_url = clean_url(post.get("image_url", ""))
         if not img_url or not img_url.startswith("http"):
             raise Exception("Tautan gambar postingan tidak valid.")
         if status_box:
@@ -1117,7 +1130,7 @@ def create_instagram_container_direct(post: dict, status_box=None) -> str:
         return res["id"]
 
 def wait_for_media_ready_direct(container_id: str, max_wait_seconds: int = 180, status_box=None):
-    url = f"{GRAPH_API_URL}/{container_id}"
+    url = clean_url(f"{GRAPH_API_URL}/{container_id}")
     params = {"fields": "status_code,status", "access_token": META_ACCESS_TOKEN}
     s = requests.Session()
     s.trust_env = False
@@ -1140,7 +1153,7 @@ def wait_for_media_ready_direct(container_id: str, max_wait_seconds: int = 180, 
 def publish_to_instagram_direct(container_id: str, status_box=None) -> str:
     if status_box:
         status_box.write("🚀 Mempublikasikan materi ke akun feed Instagram @ishak_radjab...")
-    url = f"{GRAPH_API_URL}/{IG_USER_ID}/media_publish"
+    url = clean_url(f"{GRAPH_API_URL}/{IG_USER_ID}/media_publish")
     s = requests.Session()
     s.trust_env = False
     s.proxies = {"http": "", "https": ""}
@@ -1394,7 +1407,7 @@ with tab_studio:
             with col_c:
                 st.markdown("<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 8px;'>🎬 PEMUTAR VIDEO REELS (9:16)</div>", unsafe_allow_html=True)
                 video_play_target = st.session_state.get("reels_play_src", "[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)")
-                st.video(video_play_target)
+                st.video(clean_url(video_play_target))
                 
                 if "rendered_slides" in st.session_state and st.session_state["rendered_slides"]:
                     with st.expander("🖼️ Klik untuk Melihat Desain Cover / Thumbnail Reels"):
