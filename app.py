@@ -1545,11 +1545,11 @@ with tab_studio:
                         new_entry["published_at"] = datetime.now(LOCAL_TZ).isoformat()
                         posts.append(new_entry)
                         save_posts(posts)
-                        status_box.update(label="🎉 Sukses Terbit di Instagram!", state="complete")
+                        status_box.update(label="🎉 Sukses Terbit di Instagram!", state="complete", expanded=True)
                         st.success(f"🎉 Hebat! Postingan `{new_id}` berhasil tayang di Instagram! Post ID: `{ig_post_id}`")
                     except Exception as err:
-                        status_box.update(label="❌ Gagal Menerbitkan", state="error")
-                        st.error(f"Gagal menerbitkan: {err}")
+                        status_box.update(label="❌ Gagal Menerbitkan", state="error", expanded=True)
+                        st.error(f"Rincian Penyebab Gagal: {err}")
 
 # ==================== TAB 3: ANTREAN & KALENDER ====================
 with tab_queue:
@@ -1618,13 +1618,13 @@ with tab_queue:
                                     if "error_message" in p:
                                         del p["error_message"]
                                     save_posts(posts)
-                                    status_box.update(label="🎉 Sukses Terbit!", state="complete")
+                                    status_box.update(label="🎉 Sukses Terbit!", state="complete", expanded=True)
                                     st.success(f"🎉 Sukses! {post_id} terbit di Instagram! ID: `{ig_id}`")
                                     time.sleep(1.5)
                                     st.rerun()
                                 except Exception as err:
-                                    status_box.update(label="❌ Gagal Terbit", state="error")
-                                    st.error(f"Gagal menerbitkan: {err}")
+                                    status_box.update(label="❌ Gagal Terbit", state="error", expanded=True)
+                                    st.error(f"Rincian Penyebab Gagal: {err}")
                     else:
                         if st.button("Set PENDING", key=f"btn_pend_{post_id}"):
                             p["status"] = "PENDING"
