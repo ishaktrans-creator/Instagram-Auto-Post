@@ -471,7 +471,7 @@ def generate_caption_ai(topic: str, revision_note: str = "") -> str:
 
     s = requests.Session()
     s.trust_env = False
-    s.proxies = {"http": None, "https": None}
+    s.proxies = {"http": "", "https": ""}
 
     for attempt in range(1, 4):
         try:
@@ -528,7 +528,7 @@ def research_30_ideas_ai(niche_name: str) -> list:
     
     s = requests.Session()
     s.trust_env = False
-    s.proxies = {"http": None, "https": None}
+    s.proxies = {"http": "", "https": ""}
     try:
         res = s.post(url, json=payload, timeout=60).json()
         if "candidates" in res and res["candidates"]:
@@ -620,7 +620,7 @@ def render_cover_slide(badge: str, raw_hook: str, footer_text: str):
     try:
         s = requests.Session()
         s.trust_env = False
-        s.proxies = {"http": None, "https": None}
+        s.proxies = {"http": "", "https": ""}
         r = s.get(bg_url, timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
@@ -685,7 +685,7 @@ def render_content_slide(badge: str, header_title: str, points_list: list, foote
     try:
         s = requests.Session()
         s.trust_env = False
-        s.proxies = {"http": None, "https": None}
+        s.proxies = {"http": "", "https": ""}
         r = s.get(bg_url, timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
@@ -756,7 +756,7 @@ def render_closing_slide(badge: str, point_text: str, cta_text: str, footer_text
     try:
         s = requests.Session()
         s.trust_env = False
-        s.proxies = {"http": None, "https": None}
+        s.proxies = {"http": "", "https": ""}
         r = s.get(bg_url, timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
@@ -839,7 +839,7 @@ def render_reels_cover_slide(badge: str, raw_hook: str, footer_text: str):
     try:
         s = requests.Session()
         s.trust_env = False
-        s.proxies = {"http": None, "https": None}
+        s.proxies = {"http": "", "https": ""}
         r = s.get(bg_url, timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
@@ -892,7 +892,7 @@ def render_single_image(badge: str, hook: str, points: list, footer_text: str):
     try:
         s = requests.Session()
         s.trust_env = False
-        s.proxies = {"http": None, "https": None}
+        s.proxies = {"http": "", "https": ""}
         r = s.get(bg_url, timeout=10)
         bg = Image.open(BytesIO(r.content)).convert("RGB").resize((W, H))
     except Exception:
@@ -944,59 +944,78 @@ def render_single_image(badge: str, hook: str, points: list, footer_text: str):
 
     return bg
 
-def upload_image_cloud(pil_img) -> str:
-    """Mengunggah slide ke cloud via ImgBB API resmi (bebas blokir proxy)."""
+def upload_image_cloud(pil_img, custom_key="") -> str:
+    """Mengunggah slide ke cloud dengan 5 lapisan server CDN resmi tanpa memodifikasi adapter bawaan."""
     buf = BytesIO()
     pil_img.save(buf, format="JPEG", quality=90)
     img_bytes = buf.getvalue()
+    b64_img = base64.b64encode(img_bytes).decode("utf-8")
     err_logs = []
 
     s = requests.Session()
     s.trust_env = False
-    s.proxies = {"http": None, "https": None}
-    adapter = requests.adapters.HTTPAdapter(max_retries=2)
-    s.mount("https://", adapter)
-    s.mount("http://", adapter)
+    s.proxies = {"http": "", "https": ""}
 
-    # 1. Jalur Utama: ImgBB API Resmi (Whitelisted di AWS & Streamlit)
+    # 1. Custom ImgBB Key (jika diisi pengguna di sidebar)
+    if custom_key:
+        try:
+            r = s.post("[https://api.imgbb.com/1/upload](https://api.imgbb.com/1/upload)", data={"key": custom_key, "image": b64_img}, timeout=25)
+            if r.status_code == 200:
+                res_j = r.json()
+                if "data" in res_j and "url" in res_j["data"]:
+                    return res_j["data"]["url"]
+            err_logs.append(f"Custom ImgBB: HTTP {r.status_code}")
+        except Exception as e:
+            err_logs.append(f"Custom ImgBB: {str(e)[:50]}")
+
+    # 2. Imgur CDN Resmi (Client-ID publik)
     try:
-        b64_img = base64.b64encode(img_bytes).decode("utf-8")
-        payload = {"key": "232565fc1a4f0d24578d9aeadc0b43ab", "image": b64_img}
-        r = s.post("[https://api.imgbb.com/1/upload](https://api.imgbb.com/1/upload)", data=payload, timeout=30)
+        headers = {"Authorization": "Client-ID 546c25a59c58ad7"}
+        r = s.post("[https://api.imgur.com/3/image](https://api.imgur.com/3/image)", headers=headers, data={"image": b64_img, "type": "base64"}, timeout=25)
         if r.status_code == 200:
             res_j = r.json()
-            if "data" in res_j and "url" in res_j["data"]:
-                return res_j["data"]["url"]
-        err_logs.append(f"ImgBB: {r.status_code}")
+            if "data" in res_j and "link" in res_j["data"]:
+                return res_j["data"]["link"]
+        err_logs.append(f"Imgur: HTTP {r.status_code}")
     except Exception as e:
-        err_logs.append(f"ImgBB: {str(e)}")
+        err_logs.append(f"Imgur: {str(e)[:50]}")
 
-    # 2. Jalur Cadangan 1: Freeimage.host (Base64)
+    # 3. Freeimage.host API (Base64)
     try:
-        b64_img = base64.b64encode(img_bytes).decode("utf-8")
         data = {"key": "6d207e02198a847aa98d0a2a901485a5", "action": "upload", "source": b64_img, "format": "json"}
-        r = s.post("[https://freeimage.host/api/1/upload](https://freeimage.host/api/1/upload)", data=data, timeout=30)
+        r = s.post("[https://freeimage.host/api/1/upload](https://freeimage.host/api/1/upload)", data=data, timeout=25)
         if r.status_code == 200:
             res_j = r.json()
             if "image" in res_j and "url" in res_j["image"]:
                 return res_j["image"]["url"]
-        err_logs.append(f"Freeimage: {r.status_code}")
+        err_logs.append(f"Freeimage: HTTP {r.status_code}")
     except Exception as e:
-        err_logs.append(f"Freeimage: {str(e)}")
+        err_logs.append(f"Freeimage: {str(e)[:50]}")
 
-    # 3. Jalur Cadangan 2: Catbox.moe
+    # 4. ImgBB Backup CDN
     try:
-        data = {"reqtype": "fileupload"}
-        files = {"fileToUpload": ("slide.jpg", img_bytes, "image/jpeg")}
-        r = s.post("[https://catbox.moe/user/api.php](https://catbox.moe/user/api.php)", data=data, files=files, timeout=25)
-        txt = r.text.strip()
-        if r.status_code == 200 and txt.startswith("http"):
-            return txt
-        err_logs.append(f"Catbox: {r.status_code}")
+        r = s.post("[https://api.imgbb.com/1/upload](https://api.imgbb.com/1/upload)", data={"key": "232565fc1a4f0d24578d9aeadc0b43ab", "image": b64_img}, timeout=25)
+        if r.status_code == 200:
+            res_j = r.json()
+            if "data" in res_j and "url" in res_j["data"]:
+                return res_j["data"]["url"]
+        err_logs.append(f"ImgBB: HTTP {r.status_code}")
     except Exception as e:
-        err_logs.append(f"Catbox: {str(e)}")
+        err_logs.append(f"ImgBB: {str(e)[:50]}")
 
-    raise Exception(f"Gagal mengunggah slide ke cloud: {', '.join(err_logs)}")
+    # 5. Tmpfiles.org API
+    try:
+        files = {"file": ("slide.jpg", img_bytes, "image/jpeg")}
+        r = s.post("[https://tmpfiles.org/api/v1/upload](https://tmpfiles.org/api/v1/upload)", files=files, timeout=20)
+        if r.status_code == 200:
+            res_j = r.json()
+            if "data" in res_j and "url" in res_j["data"]:
+                return res_j["data"]["url"].replace("tmpfiles.org/", "tmpfiles.org/dl/")
+        err_logs.append(f"Tmpfiles: HTTP {r.status_code}")
+    except Exception as e:
+        err_logs.append(f"Tmpfiles: {str(e)[:50]}")
+
+    raise Exception(f"Gagal mengunggah slide: {', '.join(err_logs)}")
 
 def upload_video_cloud(file_obj, filename="video.mp4") -> str:
     if hasattr(file_obj, "getvalue"):
@@ -1008,7 +1027,7 @@ def upload_video_cloud(file_obj, filename="video.mp4") -> str:
 
     s = requests.Session()
     s.trust_env = False
-    s.proxies = {"http": None, "https": None}
+    s.proxies = {"http": "", "https": ""}
 
     try:
         files = {"fileToUpload": (filename, data_bytes, "video/mp4")}
@@ -1022,7 +1041,7 @@ def upload_video_cloud(file_obj, filename="video.mp4") -> str:
     return ""
 
 # ==================== ENGINE PENERBITAN INSTAGRAM ====================
-def create_instagram_container_direct(post: dict) -> str:
+def create_instagram_container_direct(post: dict, status_box=None) -> str:
     if not META_ACCESS_TOKEN or not IG_USER_ID:
         raise Exception("Kredensial META_ACCESS_TOKEN atau IG_USER_ID belum terpasang.")
 
@@ -1031,13 +1050,15 @@ def create_instagram_container_direct(post: dict) -> str:
 
     s = requests.Session()
     s.trust_env = False
-    s.proxies = {"http": None, "https": None}
+    s.proxies = {"http": "", "https": ""}
 
     if "carousel_urls" in post and isinstance(post["carousel_urls"], list) and len(post["carousel_urls"]) > 1:
         children_ids = []
-        for img_url in post["carousel_urls"]:
+        for idx, img_url in enumerate(post["carousel_urls"], 1):
             if not img_url or not img_url.startswith("http"):
                 raise Exception("Terdapat tautan gambar slide yang kosong atau tidak valid.")
+            if status_box:
+                status_box.write(f"📤 Menghubungkan Slide {idx} ke Meta Instagram...")
                 
             child_payload = {
                 "image_url": img_url,
@@ -1046,10 +1067,12 @@ def create_instagram_container_direct(post: dict) -> str:
             }
             c_res = s.post(url, params=child_payload, timeout=30).json()
             if "id" not in c_res:
-                raise Exception(f"Gagal upload slide karosel: {c_res}")
+                raise Exception(f"Gagal upload slide karosel {idx}: {c_res}")
             children_ids.append(c_res["id"])
             time.sleep(2)
 
+        if status_box:
+            status_box.write("📦 Menggabungkan slide menjadi album Karosel Instagram...")
         parent_payload = {
             "media_type": "CAROUSEL",
             "children": ",".join(children_ids),
@@ -1062,6 +1085,8 @@ def create_instagram_container_direct(post: dict) -> str:
         return res["id"]
 
     elif "video_url" in post and post["video_url"]:
+        if status_box:
+            status_box.write("🎬 Mendaftarkan video Reels ke Meta...")
         payload = {
             "media_type": "REELS",
             "video_url": post["video_url"],
@@ -1078,6 +1103,8 @@ def create_instagram_container_direct(post: dict) -> str:
         img_url = post.get("image_url", "")
         if not img_url or not img_url.startswith("http"):
             raise Exception("Tautan gambar postingan tidak valid.")
+        if status_box:
+            status_box.write("🖼️ Mendaftarkan gambar Feed tunggal ke Meta...")
             
         payload = {
             "image_url": img_url,
@@ -1089,12 +1116,12 @@ def create_instagram_container_direct(post: dict) -> str:
             raise Exception(f"Gagal membuat container Image: {res}")
         return res["id"]
 
-def wait_for_media_ready_direct(container_id: str, max_wait_seconds: int = 180):
+def wait_for_media_ready_direct(container_id: str, max_wait_seconds: int = 180, status_box=None):
     url = f"{GRAPH_API_URL}/{container_id}"
     params = {"fields": "status_code,status", "access_token": META_ACCESS_TOKEN}
     s = requests.Session()
     s.trust_env = False
-    s.proxies = {"http": None, "https": None}
+    s.proxies = {"http": "", "https": ""}
     start = time.time()
     while time.time() - start < max_wait_seconds:
         res = s.get(url, params=params, timeout=20).json()
@@ -1105,26 +1132,30 @@ def wait_for_media_ready_direct(container_id: str, max_wait_seconds: int = 180):
             raise Exception(f"Meta gagal memproses video: {res}")
         elif status == "EXPIRED":
             raise Exception("Container video kedaluwarsa.")
+        if status_box:
+            status_box.write("⏳ Menunggu server Instagram selesai memproses rendering...")
         time.sleep(8)
     raise TimeoutError("Waktu tunggu video di Meta melebihi batas waktu.")
 
-def publish_to_instagram_direct(container_id: str) -> str:
+def publish_to_instagram_direct(container_id: str, status_box=None) -> str:
+    if status_box:
+        status_box.write("🚀 Mempublikasikan materi ke akun feed Instagram @ishak_radjab...")
     url = f"{GRAPH_API_URL}/{IG_USER_ID}/media_publish"
     s = requests.Session()
     s.trust_env = False
-    s.proxies = {"http": None, "https": None}
+    s.proxies = {"http": "", "https": ""}
     res = s.post(url, params={"creation_id": container_id, "access_token": META_ACCESS_TOKEN}, timeout=30).json()
     if "id" not in res:
         raise Exception(f"Gagal publish ke Instagram: {res}")
     return res["id"]
 
-def execute_publish_post(post: dict) -> str:
-    container_id = create_instagram_container_direct(post)
+def execute_publish_post(post: dict, status_box=None) -> str:
+    container_id = create_instagram_container_direct(post, status_box)
     if "video_url" in post and post["video_url"]:
-        wait_for_media_ready_direct(container_id)
+        wait_for_media_ready_direct(container_id, status_box=status_box)
     else:
         time.sleep(3)
-    return publish_to_instagram_direct(container_id)
+    return publish_to_instagram_direct(container_id, status_box)
 
 # ==================== SIDEBAR ====================
 with st.sidebar:
@@ -1164,7 +1195,8 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     branding_handle = st.text_input("Branding Footer Gambar", value="@ishak_radjab")
-    
+    custom_imgbb_key = st.text_input("ImgBB Key (Opsional)", type="password", help="Bisa dikosongkan. Gunakan key pribadi dari api.imgbb.com jika ingin jalur privat.")
+
     st.markdown("""
     <div style="background: rgba(18, 24, 38, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 14px; margin-top: 24px;">
       <div style="font-size: 12px; color: #94A3B8;">⏰ <b>Jadwal Publikasi:</b></div>
@@ -1438,7 +1470,7 @@ with tab_studio:
         col_act_save, col_act_pub = st.columns(2)
         with col_act_save:
             if st.button("💾 Simpan ke Antrean Terjadwal (posts.json)", type="secondary"):
-                with st.spinner("Mengunggah aset media ke cloud dan memperbarui antrean..."):
+                with st.spinner("Menyimpan draf materi ke antrean posts.json..."):
                     posts = load_posts()
                     new_id = f"post-{len(posts) + 1:03d}"
                     new_entry = {
@@ -1448,25 +1480,25 @@ with tab_studio:
                     }
                     try:
                         if "CAROUSEL" in media_type:
-                            urls = [upload_image_cloud(img) for img in st.session_state["rendered_slides"]]
+                            urls = [upload_image_cloud(img, custom_imgbb_key) for img in st.session_state["rendered_slides"]]
                             new_entry["carousel_urls"] = urls
                         elif "IMAGE" in media_type:
-                            new_entry["image_url"] = upload_image_cloud(st.session_state["rendered_slides"][0])
+                            new_entry["image_url"] = upload_image_cloud(st.session_state["rendered_slides"][0], custom_imgbb_key)
                         elif "REELS" in media_type:
                             if st.session_state.get("reels_is_uploaded", False) and uploaded_video_file is not None:
                                 new_entry["video_url"] = upload_video_cloud(uploaded_video_file, uploaded_video_file.name)
                             else:
                                 new_entry["video_url"] = custom_media if custom_media else "[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)"
-                        
-                        posts.append(new_entry)
-                        save_posts(posts)
-                        st.success(f"🎉 Sukses! Draf `{new_id}` berhasil dimasukkan ke antrean posts.json bertanda PENDING!")
                     except Exception as err:
-                        st.error(f"Gagal menyimpan ke antrean: {err}")
+                        st.warning(f"⚠️ Gambar belum di-cache ke cloud ({err}), draf tetap disimpan dan akan diproses otomatis.")
+                    
+                    posts.append(new_entry)
+                    save_posts(posts)
+                    st.success(f"🎉 Sukses! Draf `{new_id}` berhasil dimasukkan ke antrean posts.json bertanda PENDING!")
 
         with col_act_pub:
             if st.button("🚀 Simpan & Publish Langsung ke Instagram!", type="primary"):
-                with st.spinner("Mengunggah slide via ImgBB dan menerbitkan langsung ke akun Instagram @ishak_radjab..."):
+                with st.status("Sedang memproses dan menerbitkan ke Instagram...", expanded=True) as status_box:
                     posts = load_posts()
                     new_id = f"post-{len(posts) + 1:03d}"
                     new_entry = {
@@ -1475,25 +1507,35 @@ with tab_studio:
                         "status": "PENDING"
                     }
                     try:
+                        status_box.write("☁️ Mengunggah gambar slide ke server CDN resmi...")
                         if "CAROUSEL" in media_type:
-                            urls = [upload_image_cloud(img) for img in st.session_state["rendered_slides"]]
+                            urls = []
+                            for idx, img in enumerate(st.session_state["rendered_slides"], 1):
+                                u = upload_image_cloud(img, custom_imgbb_key)
+                                urls.append(u)
+                                status_box.write(f"✅ Slide {idx} terunggah ke: `{u[:40]}...`")
                             new_entry["carousel_urls"] = urls
                         elif "IMAGE" in media_type:
-                            new_entry["image_url"] = upload_image_cloud(st.session_state["rendered_slides"][0])
+                            u = upload_image_cloud(st.session_state["rendered_slides"][0], custom_imgbb_key)
+                            new_entry["image_url"] = u
+                            status_box.write(f"✅ Gambar terunggah ke: `{u[:40]}...`")
                         elif "REELS" in media_type:
                             if st.session_state.get("reels_is_uploaded", False) and uploaded_video_file is not None:
                                 new_entry["video_url"] = upload_video_cloud(uploaded_video_file, uploaded_video_file.name)
                             else:
                                 new_entry["video_url"] = custom_media if custom_media else "[https://files.catbox.moe/ez3k5w.mp4](https://files.catbox.moe/ez3k5w.mp4)"
 
-                        ig_post_id = execute_publish_post(new_entry)
+                        status_box.write("📡 Menghubungkan ke Meta Graph API Instagram...")
+                        ig_post_id = execute_publish_post(new_entry, status_box)
                         new_entry["status"] = "PUBLISHED"
                         new_entry["published_id"] = ig_post_id
                         new_entry["published_at"] = datetime.now(LOCAL_TZ).isoformat()
                         posts.append(new_entry)
                         save_posts(posts)
-                        st.success(f"🎉 Hebat! `{new_id}` berhasil tayang di Instagram! Post ID: `{ig_post_id}`")
+                        status_box.update(label="🎉 Sukses Terbit di Instagram!", state="complete")
+                        st.success(f"🎉 Hebat! Postingan `{new_id}` berhasil tayang di Instagram! Post ID: `{ig_post_id}`")
                     except Exception as err:
+                        status_box.update(label="❌ Gagal Menerbitkan", state="error")
                         st.error(f"Gagal menerbitkan: {err}")
 
 # ==================== TAB 3: ANTREAN & KALENDER ====================
@@ -1544,19 +1586,31 @@ with tab_queue:
                 with c3:
                     if status == "PENDING":
                         if st.button("🚀 Publish Sekarang", key=f"btn_pub_now_{post_id}", type="primary"):
-                            with st.spinner(f"Menerbitkan {post_id} langsung ke Instagram @ishak_radjab..."):
+                            with st.status(f"Menerbitkan {post_id} ke Instagram...", expanded=True) as status_box:
                                 try:
-                                    ig_id = execute_publish_post(p)
+                                    # Jika postingan belum memiliki URL media cloud, render & upload sekarang
+                                    if "carousel_urls" not in p and "image_url" not in p and "video_url" not in p:
+                                        status_box.write("🎨 Merender slide visual...")
+                                        badge, hook, points, cta_text = parse_content(p.get("caption", ""))
+                                        s1 = render_cover_slide(badge, hook, branding_handle)
+                                        s2 = render_content_slide(badge, "Pondasi Utama yang Wajib Dibangun", points[:2], branding_handle)
+                                        s3 = render_closing_slide(badge, points[-1], cta_text, branding_handle)
+                                        status_box.write("☁️ Mengunggah slide ke cloud...")
+                                        p["carousel_urls"] = [upload_image_cloud(s, custom_imgbb_key) for s in [s1, s2, s3]]
+                                    
+                                    ig_id = execute_publish_post(p, status_box)
                                     p["status"] = "PUBLISHED"
                                     p["published_id"] = ig_id
                                     p["published_at"] = datetime.now(LOCAL_TZ).isoformat()
                                     if "error_message" in p:
                                         del p["error_message"]
                                     save_posts(posts)
+                                    status_box.update(label="🎉 Sukses Terbit!", state="complete")
                                     st.success(f"🎉 Sukses! {post_id} terbit di Instagram! ID: `{ig_id}`")
                                     time.sleep(1.5)
                                     st.rerun()
                                 except Exception as err:
+                                    status_box.update(label="❌ Gagal Terbit", state="error")
                                     st.error(f"Gagal menerbitkan: {err}")
                     else:
                         if st.button("Set PENDING", key=f"btn_pend_{post_id}"):
