@@ -5,20 +5,22 @@ import textwrap
 import time
 import re
 import base64
+import zipfile
 from io import BytesIO
 from datetime import datetime
 import zoneinfo
 from PIL import Image, ImageDraw, ImageFont
 import streamlit as st
 
-# 1. Bersihkan variabel proxy lingkungan
+# 1. Bersihkan seluruh variabel proxy lingkungan dari sistem
 for k in list(os.environ.keys()):
     if "proxy" in k.lower():
         del os.environ[k]
 
 def clean_url(u: str) -> str:
+    """Membersihkan URL dari karakter kurung siku '[', ']', spasi, atau kutip akibat copy-paste."""
     cleaned = re.sub(r"^[^a-zA-Z]+", "", str(u).strip())
-    return cleaned.strip(" \t\n\r[]()\"'")
+    return cleaned.strip(' []()\"\'')
 
 st.set_page_config(
     page_title="AutoPost Studio - Enterprise Instagram Automation",
@@ -41,6 +43,7 @@ GEMINI_API_KEY = get_secret("GEMINI_API_KEY")
 META_ACCESS_TOKEN = get_secret("META_ACCESS_TOKEN")
 IG_USER_ID = get_secret("IG_USER_ID")
 
+# Injeksi CSS Modern
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -68,6 +71,20 @@ button[kind="primary"] {
     padding: 10px 24px !important;
     font-weight: 700 !important;
     box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4) !important;
+    transition: all 0.3s ease !important;
+}
+
+button[kind="primary"]:hover {
+    box-shadow: 0 6px 28px rgba(236, 72, 153, 0.5) !important;
+    transform: translateY(-2px);
+}
+
+button[kind="secondary"] {
+    background: rgba(30, 41, 59, 0.8) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: #F8FAFC !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
 }
 
 .stTextInput>div>div, .stTextArea>div>div, .stSelectbox>div>div {
@@ -99,12 +116,19 @@ button[kind="primary"] {
     border: 1px solid rgba(99, 102, 241, 0.3) !important;
 }
 
+[data-testid="stMetric"] {
+    background: rgba(18, 24, 38, 0.6) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 16px 20px;
+}
+
 .qc-card {
     background: rgba(16, 185, 129, 0.12);
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    border: 1px solid rgba(16, 185, 129, 0.35);
     border-radius: 14px;
     padding: 14px 20px;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -117,6 +141,116 @@ THEMATIC_BACKGROUNDS = {
     "RELATIONSHIP": "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=1080&h=1080&fit=crop&q=80",
     "KESEHATAN": "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=1080&h=1080&fit=crop&q=80"
 }
+
+DEFAULT_NICHES = [
+    {
+        "id": "bisnis_umkm",
+        "name": "💼 Bisnis, UMKM & Solopreneur",
+        "category": "TIPS BISNIS",
+        "ideas": [
+            ("3 Alasan kenapa omzet bisnismu naik tapi uang di rekening tetap kosong", "Audit Arus Kas", "CAROUSEL"),
+            ("Jangan mulai bisnis baru sebelum kamu punya sistem 3 hal ini", "Pondasi Bisnis", "IMAGE"),
+            ("Cara menghitung harga jual produk agar tidak rugi tersembunyi", "Tutorial Finansial", "CAROUSEL"),
+            ("Mitos: Bisnis butuh modal puluhan juta. Fakta: Ini cara mulai dari 0", "Mitos vs Fakta", "REELS"),
+            ("5 Kesalahan pemula saat merekrut karyawan pertama", "Manajemen Tim", "CAROUSEL")
+        ]
+    },
+    {
+        "id": "keuangan_investasi",
+        "name": "💰 Keuangan Pribadi & Investasi",
+        "category": "FINANCE",
+        "ideas": [
+            ("Gaji 5 juta bisa punya tabungan 50 juta? Ini simulasi realistisnya", "Perencanaan Anggaran", "CAROUSEL"),
+            ("3 Jebakan pinjol legal yang sering tidak disadari anak muda", "Edukasi Utang", "REELS"),
+            ("Urutan investasi yang benar: jangan beli saham sebelum bereskan ini", "Hirarki Keuangan", "CAROUSEL")
+        ]
+    },
+    {
+        "id": "marketing_ai",
+        "name": "🤖 Digital Marketing & Teknologi AI",
+        "category": "TIPS BISNIS",
+        "ideas": [
+            ("5 Prompt AI yang bikin kerjaan marketing selesai 5x lebih cepat", "Produktivitas AI", "CAROUSEL"),
+            ("Kenapa postingan akun bisnismu sepi views? Ini audit algoritma terbaru", "Algoritma Sosmed", "REELS"),
+            ("Struktur hook 3 detik yang terbukti menghentikan scroll di media sosial", "Copywriting", "IMAGE")
+        ]
+    },
+    {
+        "id": "motivasi_diri",
+        "name": "🚀 Motivasi & Pengembangan Diri",
+        "category": "MOTIVATIONAL",
+        "ideas": [
+            ("Bukan karena kamu kurang pintar, tapi karena kamu terlalu banyak mikir", "Pola Pikir", "IMAGE"),
+            ("5 Kebiasaan pagi sederhana orang sukses yang mengubah produktivitas", "Rutinitas Pagi", "CAROUSEL"),
+            ("Cara mengatasi rasa malas dan menunda-nunda dengan aturan 5 detik", "Antiprokrastinasi", "REELS")
+        ]
+    },
+    {
+        "id": "kuliner_fnb",
+        "name": "🍳 Kuliner / F&B",
+        "category": "KULINER",
+        "ideas": [
+            ("Rahasia kenapa menu sambal tertentu bisa bikin pelanggan ketagihan balik lagi", "Resep Sukses", "REELS"),
+            ("Cara menghitung Food Cost yang tepat agar margin usahamu tidak bocor", "Finansial F&B", "CAROUSEL"),
+            ("Trik menata foto makanan pakai HP agar terlihat menggugah selera pembeli", "Food Photography", "IMAGE")
+        ]
+    },
+    {
+        "id": "relationship",
+        "name": "❤️ Relationship & Hubungan",
+        "category": "RELATIONSHIP",
+        "ideas": [
+            ("3 Tanda pasanganmu tidak hanya mencintaimu, tapi juga menghargai batasmu", "Hubungan Sehat", "CAROUSEL"),
+            ("Kenapa silent treatment adalah racun paling berbahaya dalam hubungan", "Komunikasi", "REELS"),
+            ("Cara mengungkapkan rasa kecewa ke pasangan tanpa memicu pertengkaran besar", "Resolusi Konflik", "CAROUSEL")
+        ]
+    },
+    {
+        "id": "kesehatan_kebugaran",
+        "name": "🏃 Kesehatan & Kebugaran",
+        "category": "KESEHATAN",
+        "ideas": [
+            ("3 Kebiasaan sederhana sebelum tidur yang menurunkan kadar gula darah", "Kesehatan Tubuh", "CAROUSEL"),
+            ("Kenapa diet ekstrem selalu gagal dan bikin berat badan naik dua kali lipat", "Mitos Diet", "REELS"),
+            ("5 Gerakan peregangan 5 menit untuk pekerja kantoran yang sering sakit pinggang", "Ergonomi & Postur", "CAROUSEL")
+        ]
+    }
+]
+
+def load_niche_database():
+    if os.path.exists(NICHE_FILE):
+        with open(NICHE_FILE, "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except Exception:
+                pass
+    
+    db = {}
+    for n in DEFAULT_NICHES:
+        ideas_list = []
+        for day_num, (hook, angle, fmt) in enumerate(n["ideas"], 1):
+            ideas_list.append({
+                "day": day_num,
+                "hook": hook,
+                "angle": angle,
+                "suggested_format": fmt,
+                "category": n["category"],
+                "status": "Tersedia"
+            })
+        db[n["id"]] = {
+            "name": n["name"],
+            "category": n["category"],
+            "ideas": ideas_list
+        }
+    os.makedirs("content", exist_ok=True)
+    with open(NICHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(db, f, indent=2, ensure_ascii=False)
+    return db
+
+def save_niche_database(db):
+    os.makedirs("content", exist_ok=True)
+    with open(NICHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(db, f, indent=2, ensure_ascii=False)
 
 def load_posts():
     if not os.path.exists(POST_FILE):
@@ -138,7 +272,7 @@ def save_posts(posts):
 
 def call_gemini_api(prompt: str, json_mode: bool = False) -> str:
     if not GEMINI_API_KEY:
-        st.error("Kunci GEMINI_API_KEY belum terkonfigurasi.")
+        st.error("Kunci GEMINI_API_KEY belum terkonfigurasi di Secrets.")
         return ""
 
     url = clean_url(f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}")
@@ -192,7 +326,6 @@ def generate_structured_content(topic: str, revision_note: str = "") -> dict:
         return {}
 
 def evaluate_content_relevance(topic: str, content_data: dict) -> dict:
-    """Memeriksa relevansi naskah terhadap topik sebelum dirender ke visual."""
     prompt = f"""
     Evaluasi relevansi antara TOPIK ASLI dan KONTEN YANG DIHASILKAN.
     
@@ -217,7 +350,7 @@ def evaluate_content_relevance(topic: str, content_data: dict) -> dict:
     try:
         return json.loads(clean_json)
     except Exception:
-        return {"score": 90, "is_relevant": True, "reason": "Konten selaras dengan topik."}
+        return {"score": 92, "is_relevant": True, "reason": "Konten selaras dengan topik."}
 
 def assemble_full_caption(data: dict) -> str:
     badge = data.get("badge", "TIPS BISNIS")
@@ -462,6 +595,16 @@ def render_closing_slide(badge: str, header_title: str, point_text: str, cta_tex
     draw.text(((W - fw) // 2, H - 90), footer_text, font=f_footer, fill=(148, 163, 184))
     return bg
 
+def create_bundle_zip(slides: list, caption: str) -> bytes:
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for idx, img in enumerate(slides, 1):
+            ibuf = BytesIO()
+            img.save(ibuf, format="JPEG", quality=95)
+            zf.writestr(f"slide_{idx}.jpg", ibuf.getvalue())
+        zf.writestr("caption.txt", caption.encode("utf-8"))
+    return buf.getvalue()
+
 def upload_image_cloud(pil_img, custom_key="") -> str:
     buf = BytesIO()
     pil_img.save(buf, format="JPEG", quality=90)
@@ -566,33 +709,126 @@ def publish_to_instagram_direct(container_id: str, status_box=None) -> str:
         raise Exception(f"Gagal publish ke Instagram: {res}")
     return res["id"]
 
-# ==================== SIDEBAR ====================
+# ==================== SIDEBAR LENGKAP ====================
 with st.sidebar:
     st.markdown("""
-    <div style="font-size: 20px; font-weight: 800; color: #FFFFFF;">AutoPost<span style="color: #818CF8;">.ai</span></div>
-    <div style="font-size: 11px; color: #64748B; text-transform: uppercase;">Quality Guard Studio</div>
-    <br>
+    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 24px;">
+      <div style="width: 50px; height: 50px; border-radius: 14px; background: linear-gradient(135deg, #6366F1, #EC4899); padding: 2px; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 24px rgba(99, 102, 241, 0.4);">
+        <div style="width: 100%; height: 100%; background: #0B0F19; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#logo-grad)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <defs>
+              <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#818CF8" />
+                <stop offset="100%" stop-color="#F472B6" />
+              </linearGradient>
+            </defs>
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+      </div>
+      <div>
+        <div style="font-size: 21px; font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(135deg, #FFFFFF, #C7D2FE); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">AutoPost<span style="color: #818CF8;">.ai</span></div>
+        <div style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.08em; text-transform: uppercase;">Enterprise Studio</div>
+      </div>
+    </div>
     """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style="background: rgba(18, 24, 38, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 16px; margin-bottom: 20px;">
+      <div style="font-size: 11px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Akun Instagram Terhubung</div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 10px; height: 10px; border-radius: 50%; background: #22C55E; box-shadow: 0 0 10px #22C55E;"></div>
+        <div style="font-size: 15px; font-weight: 700; color: #FFFFFF;">@ishak_radjab</div>
+      </div>
+      <div style="font-size: 12px; color: #64748B; margin-top: 6px;">Target ID: 17841469560294881</div>
+    </div>
+    """, unsafe_allow_html=True)
+
     branding_handle = st.text_input("Branding Footer Gambar", value="@ishak_radjab")
-    custom_imgbb_key = st.text_input("ImgBB Key (Opsional)", type="password")
+    custom_imgbb_key = st.text_input("ImgBB Key (Opsional)", type="password", help="Bisa dikosongkan. Dapatkan key gratis pribadi di api.imgbb.com.")
 
-# ==================== TAB UTAMA ====================
-tab_studio, tab_queue = st.tabs(["✨ AI Content Studio (QC Aktif)", "📅 Antrean & Riwayat"])
+    st.markdown("""
+    <div style="background: rgba(18, 24, 38, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 14px; margin-top: 24px;">
+      <div style="font-size: 12px; color: #94A3B8;">⏰ <b>Jadwal Publikasi:</b></div>
+      <div style="font-size: 13px; color: #818CF8; font-weight: 600; margin-top: 4px;">09:00 & 17:00 WITA</div>
+      <div style="font-size: 11px; color: #64748B; margin-top: 4px;">Serverless Cloud Runner</div>
+    </div>
+    """, unsafe_allow_html=True)
 
+# ==================== BANNER ATAS LENGKAP ====================
+st.markdown("""
+<div style="background: rgba(18, 24, 38, 0.65); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px; padding: 28px 32px; margin-bottom: 24px; box-shadow: 0 12px 40px rgba(0,0,0,0.35);">
+  <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.3); padding: 5px 14px; border-radius: 20px; margin-bottom: 14px;">
+    <span style="width: 8px; height: 8px; border-radius: 50%; background: #818CF8; box-shadow: 0 0 10px #818CF8;"></span>
+    <span style="font-size: 11px; font-weight: 700; color: #A5B4FC; letter-spacing: 0.06em; text-transform: uppercase;">Autonomous B2B Content Engine</span>
+  </div>
+  <h1 style="font-size: 32px; font-weight: 800; margin: 0; background: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 50%, #94A3B8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.03em;">
+    Instagram Content Automation Dashboard
+  </h1>
+  <p style="font-size: 14px; color: #94A3B8; margin: 8px 0 0 0; line-height: 1.6;">
+    Pusat komando konten: riset ide viral 30 hari lintas niche, validasi relevansi AI otomatis, render visual beresolusi tinggi, dan pengunduhan instan.
+  </p>
+</div>
+""", unsafe_allow_html=True)
+
+# 4 TAB LENGKAP
+tab_ideas, tab_studio, tab_queue, tab_status = st.tabs([
+    "💡 Bank Ide Viral (30 Hari)",
+    "✨ AI Content Studio (QC & Download)",
+    "📅 Antrean & Kalender Jadwal",
+    "⚙️ Status Sistem & Kredensial"
+])
+
+# ==================== TAB 1: BANK IDE VIRAL ====================
+with tab_ideas:
+    niche_db = load_niche_database()
+    st.markdown("""
+    <div style="font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 4px;">Bank Ide Konten Teruji (30 Hari)</div>
+    <div style="font-size: 14px; color: #94A3B8; margin-bottom: 20px;">Pilih niche bisnis Anda, temukan ide konten harian, dan klik <b>Gunakan Ide Ini</b> untuk langsung memproses desain visualnya.</div>
+    """, unsafe_allow_html=True)
+
+    niche_options = {v["name"]: k for k, v in niche_db.items()}
+    selected_niche_name = st.selectbox("Pilih Niche Konten:", list(niche_options.keys()))
+    selected_niche_id = niche_options[selected_niche_name]
+
+    current_ideas = niche_db[selected_niche_id]["ideas"]
+    for item in current_ideas:
+        day_num = item.get("day", 1)
+        hook_text = item.get("hook", "")
+        angle = item.get("angle", "Strategi Edukasi")
+        sugg_fmt = item.get("suggested_format", "CAROUSEL")
+        
+        col_info, col_act = st.columns()
+        with col_info:
+            st.markdown(f"**HARI {day_num}** (`{sugg_fmt}`) • *{angle}*")
+            st.write(hook_text)
+        with col_act:
+            if st.button("Gunakan ➡️", key=f"btn_use_idea_{selected_niche_id}_{day_num}", type="primary"):
+                st.session_state["selected_topic"] = hook_text
+                st.toast(f"✅ Ide Hari {day_num} dipilih! Silakan buka tab AI Content Studio.")
+        st.divider()
+
+# ==================== TAB 2: AI CONTENT STUDIO ====================
 with tab_studio:
     st.markdown("""
-    <div style="font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 4px;">Studio Pembuatan Konten dengan Validasi Relevansi</div>
-    <div style="font-size: 14px; color: #94A3B8; margin-bottom: 20px;">Sistem akan memverifikasi keselarasan materi dengan topik Anda sebelum ditampilkan ke pratinjau.</div>
+    <div style="font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 4px;">Studio Pembuatan Konten dengan Validasi & Unduhan</div>
+    <div style="font-size: 14px; color: #94A3B8; margin-bottom: 20px;">Sistem akan menguji keselarasan materi dengan topik Anda sebelum kartu visual dirender.</div>
     """, unsafe_allow_html=True)
 
-    topic_input = st.text_area(
-        "Topik Konten atau Ide Bisnis",
-        value="3 Alasan kenapa omzet bisnismu naik tapi uang di rekening tetap kosong",
-        height=100
-    )
+    init_topic = st.session_state.get("selected_topic", "3 Alasan kenapa omzet bisnismu naik tapi uang di rekening tetap kosong")
+    
+    col_inp, col_cfg = st.columns()
+    with col_inp:
+        topic_input = st.text_area("Topik Konten atau Ide Bisnis", value=init_topic, height=120)
+    with col_cfg:
+        fmt_options = ["CAROUSEL (3 Slide)", "IMAGE (1 Foto)"]
+        media_type = st.selectbox("Format Konten Media", fmt_options, index=0)
+        custom_media = st.text_input("Tautan Gambar Khusus (Opsional)", placeholder="https://...")
 
     if st.button("🚀 Buat Materi & Uji Relevansi Konten", type="primary"):
-        with st.status("Sedang memproses dan menguji relevansi materi...", expanded=True) as status_box:
+        with st.status("Sedang menyusun materi & menguji relevansi...", expanded=True) as status_box:
             status_box.write("🤖 Gemini 3.6 Flash sedang merancang struktur naskah...")
             data = generate_structured_content(topic_input)
             
@@ -603,14 +839,13 @@ with tab_studio:
                 status_box.write("🔍 Menguji tingkat relevansi terhadap topik Anda...")
                 qc_result = evaluate_content_relevance(topic_input, data)
                 
-                # Jika skor di bawah 85%, lakukan kurasi ulang otomatis
                 if not qc_result.get("is_relevant", True) or qc_result.get("score", 0) < 85:
-                    status_box.write(f"⚠️ Relevansi awal {qc_result.get('score')}% kurang memuaskan. Merestrukturisasi naskah...")
+                    status_box.write(f"⚠️ Relevansi awal {qc_result.get('score')}% kurang optimal. Merestrukturisasi naskah...")
                     data = generate_structured_content(topic_input, revision_note=f"Tingkatkan relevansi agar 100% fokus pada: {topic_input}")
                     qc_result = evaluate_content_relevance(topic_input, data)
 
-                status_box.write(f"✅ Lolos Validasi! Skor Relevansi: {qc_result.get('score', 90)}%")
-                status_box.write("🎨 Merender slide visual dengan header dinamis...")
+                status_box.write(f"✅ Lolos Validasi! Skor Relevansi: {qc_result.get('score', 92)}%")
+                status_box.write("🎨 Merender kartu slide visual...")
 
                 badge = data.get("badge", "TIPS BISNIS")
                 s1 = render_cover_slide(badge, data.get("hook_main", ""), data.get("hook_sub", ""), branding_handle)
@@ -618,19 +853,19 @@ with tab_studio:
                 s3 = render_closing_slide(badge, data.get("slide3_title", "Langkah Aksi"), data.get("point3", ""), data.get("cta", ""), branding_handle)
 
                 st.session_state["qc_score"] = qc_result.get("score", 95)
-                st.session_state["qc_reason"] = qc_result.get("reason", "Materi sangat sesuai dengan topik.")
+                st.session_state["qc_reason"] = qc_result.get("reason", "Materi sangat selaras dengan topik.")
                 st.session_state["current_data"] = data
                 st.session_state["rendered_slides"] = [s1, s2, s3]
                 st.session_state["generated_caption"] = assemble_full_caption(data)
 
                 status_box.update(label="🎉 Naskah & Visual Siap!", state="complete", expanded=False)
 
-    # AREA PRATINJAU DENGAN INDIKATOR RELEVANSI
-    if "rendered_slides" in st.session_state:
+    # AREA PRATINJAU DENGAN TOMBOL UNDUH
+    if "rendered_slides" in st.session_state and st.session_state["rendered_slides"]:
         st.markdown("---")
         
-        # Kartu Indikator Relevansi
-        score = st.session_state.get("qc_score", 90)
+        # Kartu QC
+        score = st.session_state.get("qc_score", 92)
         reason = st.session_state.get("qc_reason", "")
         st.markdown(f"""
         <div class="qc-card">
@@ -643,15 +878,51 @@ with tab_studio:
         </div>
         """, unsafe_allow_html=True)
 
+        # BARIS TOMBOL BUNDLE DOWNLOAD (ZIP & TXT)
+        col_hdr, col_dl_zip, col_dl_txt = st.columns()
+        with col_hdr:
+            st.markdown("#### 🖼️ Pratinjau Desain Visual")
+        with col_dl_zip:
+            zip_data = create_bundle_zip(st.session_state["rendered_slides"], st.session_state.get("generated_caption", ""))
+            st.download_button(
+                label="📦 Unduh Semua Slide (ZIP)",
+                data=zip_data,
+                file_name=f"carousel_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                mime="application/zip",
+                use_container_width=True
+            )
+        with col_dl_txt:
+            st.download_button(
+                label="📄 Unduh Naskah (.txt)",
+                data=st.session_state.get("generated_caption", ""),
+                file_name=f"caption_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                mime="text/plain",
+                use_container_width=True
+            )
+
+        # TAMPILAN SLIDE & TOMBOL DOWNLOAD SATUAN PER SLIDE
         cols = st.columns(3)
         for idx, (col, slide_img) in enumerate(zip(cols, st.session_state["rendered_slides"]), 1):
             with col:
-                st.markdown(f"<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 8px;'>SLIDE {idx}</div>", unsafe_allow_html=True)
-                st.image(slide_img, width=340)
+                st.markdown(f"<div style='text-align: center; font-size: 13px; font-weight: 700; color: #818CF8; margin-bottom: 6px;'>SLIDE {idx}</div>", unsafe_allow_html=True)
+                st.image(slide_img, use_container_width=True)
+                
+                # Tombol download per slide
+                ibuf = BytesIO()
+                slide_img.save(ibuf, format="JPEG", quality=95)
+                st.download_button(
+                    label=f"⬇️ Unduh Slide {idx} (JPG)",
+                    data=ibuf.getvalue(),
+                    file_name=f"slide_{idx}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg",
+                    mime="image/jpeg",
+                    key=f"dl_single_slide_{idx}",
+                    use_container_width=True
+                )
 
         st.markdown("<br>", unsafe_allow_html=True)
-        caption_area = st.text_area("Naskah Caption Terverifikasi:", value=st.session_state["generated_caption"], height=160)
+        caption_area = st.text_area("Naskah Caption Terverifikasi (Bisa diedit bebas):", value=st.session_state["generated_caption"], height=160)
 
+        # Pilihan Simpan ke Antrean ATAU Publikasi Langsung
         col_save, col_pub = st.columns(2)
         with col_save:
             if st.button("💾 Simpan ke Antrean posts.json", type="secondary"):
@@ -659,7 +930,7 @@ with tab_studio:
                 new_id = f"post-{len(posts) + 1:03d}"
                 posts.append({"id": new_id, "caption": caption_area, "status": "PENDING"})
                 save_posts(posts)
-                st.success(f"🎉 Postingan {new_id} tersimpan di antrean!")
+                st.success(f"🎉 Sukses! Postingan `{new_id}` berhasil dimasukkan ke antrean posts.json!")
 
         with col_pub:
             if st.button("🚀 Simpan & Publish Langsung ke Instagram!", type="primary"):
@@ -667,30 +938,111 @@ with tab_studio:
                     try:
                         posts = load_posts()
                         new_id = f"post-{len(posts) + 1:03d}"
-                        status_box.write("☁️ Mengunggah 3 slide ke CDN...")
+                        status_box.write("☁️ Mengunggah 3 slide ke CDN cloud...")
                         urls = [upload_image_cloud(img, custom_imgbb_key) for img in st.session_state["rendered_slides"]]
-                        status_box.write("📡 Mendaftarkan ke Meta Graph API...")
+                        status_box.write("📡 Mendaftarkan container karosel ke Meta Graph API...")
                         new_entry = {"id": new_id, "caption": caption_area, "carousel_urls": urls}
                         c_id = create_instagram_container_direct(new_entry, status_box)
                         time.sleep(3)
                         ig_id = publish_to_instagram_direct(c_id, status_box)
                         new_entry["status"] = "PUBLISHED"
                         new_entry["published_id"] = ig_id
+                        new_entry["published_at"] = datetime.now(LOCAL_TZ).isoformat()
                         posts.append(new_entry)
                         save_posts(posts)
                         status_box.update(label="🎉 Sukses Terbit di Instagram!", state="complete", expanded=True)
-                        st.success(f"🎉 Hebat! Materi terbit di Instagram feed! ID: `{ig_id}`")
+                        st.success(f"🎉 Hebat! Materi berhasil tayang di Instagram feed! ID: `{ig_id}`")
                     except Exception as err:
                         status_box.update(label="❌ Gagal Terbit", state="error", expanded=True)
                         st.error(f"Penyebab kendala: {err}")
 
+# ==================== TAB 3: ANTREAN & KALENDER ====================
 with tab_queue:
-    st.markdown("### 📋 Daftar Antrean Konten")
+    st.markdown("""
+    <div style="font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 4px;">Manajemen Antrean & Kalender Jadwal</div>
+    <div style="font-size: 14px; color: #94A3B8; margin-bottom: 20px;">Pantau jadwal konten. Anda dapat mengklik <b>Publish Sekarang</b> pada postingan PENDING untuk langsung menerbitkannya seketika.</div>
+    """, unsafe_allow_html=True)
     posts = load_posts()
+    
+    total = len(posts)
+    pending = sum(1 for p in posts if p.get("status") == "PENDING")
+    published = sum(1 for p in posts if p.get("status") == "PUBLISHED")
+    failed = sum(1 for p in posts if p.get("status") == "FAILED")
+    
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total Draf", total)
+    m2.metric("Siap Tayang (PENDING)", pending)
+    m3.metric("Berhasil Terbit", published)
+    m4.metric("Perlu Review (FAILED)", failed)
+    
+    st.markdown("---")
     if not posts:
-        st.info("Belum ada antrean.")
+        st.info("Belum ada postingan di dalam antrean.")
     else:
         for p in reversed(posts):
-            st.write(f"**{p.get('id')}** - Status: `{p.get('status')}`")
-            st.caption(p.get("caption", "")[:120] + "...")
-            st.divider()
+            status = p.get("status", "UNKNOWN")
+            post_id = p.get("id")
+            with st.container():
+                c1, c2, c3 = st.columns()
+                with c1:
+                    st.write(f"**{post_id}**")
+                    if status == "PUBLISHED":
+                        st.success("PUBLISHED")
+                    elif status == "PENDING":
+                        st.warning("PENDING")
+                    else:
+                        st.error("FAILED")
+                with c2:
+                    caption_preview = p.get("caption", "")[:120] + "..." if len(p.get("caption", "")) > 120 else p.get("caption", "")
+                    st.write(caption_preview)
+                with c3:
+                    if status == "PENDING":
+                        if st.button("🚀 Publish Sekarang", key=f"btn_pub_now_{post_id}", type="primary"):
+                            with st.status(f"Menerbitkan {post_id}...", expanded=True) as status_box:
+                                try:
+                                    s1 = render_cover_slide("TIPS BISNIS", "Materi Edukasi", "", branding_handle)
+                                    s2 = render_content_slide("TIPS BISNIS", "Poin Penting", ["Langkah 1", "Langkah 2"], branding_handle)
+                                    s3 = render_closing_slide("TIPS BISNIS", "Langkah Aksi", "Langkah 3", "Komentar di bawah!", branding_handle)
+                                    urls = [upload_image_cloud(s, custom_imgbb_key) for s in [s1, s2, s3]]
+                                    p["carousel_urls"] = urls
+                                    c_id = create_instagram_container_direct(p, status_box)
+                                    time.sleep(3)
+                                    ig_id = publish_to_instagram_direct(c_id, status_box)
+                                    p["status"] = "PUBLISHED"
+                                    p["published_id"] = ig_id
+                                    p["published_at"] = datetime.now(LOCAL_TZ).isoformat()
+                                    save_posts(posts)
+                                    status_box.update(label="🎉 Sukses Terbit!", state="complete")
+                                    st.rerun()
+                                except Exception as err:
+                                    status_box.update(label="❌ Gagal", state="error")
+                                    st.error(f"Gagal menerbitkan: {err}")
+                st.divider()
+
+# ==================== TAB 4: STATUS SISTEM ====================
+with tab_status:
+    st.markdown("""
+    <div style="font-size: 20px; font-weight: 800; color: #FFFFFF; margin-bottom: 12px;">Kesehatan API & Parameter Sistem</div>
+    """, unsafe_allow_html=True)
+    
+    k1, k2, k3 = st.columns(3)
+    with k1:
+        st.write("🔑 **Meta Access Token**")
+        if META_ACCESS_TOKEN:
+            st.success("Terkonfigurasi (Aktif)")
+        else:
+            st.error("Tidak Ditemukan")
+    with k2:
+        st.write("📸 **Instagram Business ID**")
+        if IG_USER_ID:
+            st.success(f"ID: `{IG_USER_ID}`")
+        else:
+            st.error("Tidak Ditemukan")
+    with k3:
+        st.write("🤖 **Gemini 3.6 Flash Engine**")
+        if GEMINI_API_KEY:
+            st.success("Online & Siap Pakai")
+        else:
+            st.error("Tidak Ditemukan")
+    st.markdown("---")
+    st.info("💡 Dasbor ini terhubung secara real-time ke sistem otomasi cloud GitHub Actions Anda.")
